@@ -1,0 +1,278 @@
+<?xml version='1.0' encoding='utf-8'?>
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:local="using:VideoEditor" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" x:Class="VideoEditor.MainWindow">
+    <Grid x:Name="AppHost" SizeChanged="AppHost_SizeChanged"><Viewbox x:Name="AppScale" Stretch="Fill">
+    <Grid x:Name="Root" Background="Transparent" RequestedTheme="Default" UseLayoutRounding="True" PreviewKeyDown="Root_PreviewKeyDown">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <Grid x:Name="CustomTitleBar" Height="48" Background="Transparent" SizeChanged="TitleBar_SizeChanged">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="0" x:Name="TitleLeftInset" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="0" x:Name="TitleRightInset" />
+            </Grid.ColumnDefinitions>
+            <MenuBar Grid.Column="1" Background="Transparent" VerticalAlignment="Stretch">
+                <MenuBarItem Title="ファイル">
+                    <MenuFlyoutItem Text="素材を追加…" Click="Import_Click" />
+                    <MenuFlyoutItem Text="ワークスペースを選択…" Click="ChooseWorkspace_Click" />
+                    <MenuFlyoutSubItem x:Name="RecentWorkspacesMenu" Text="最近開いたワークスペース" />
+                    <MenuFlyoutItem Text="プロジェクトを開く…" Click="Open_Click" />
+                    <MenuFlyoutItem Text="プロジェクトを保存…" Click="Save_Click" />
+                    <MenuFlyoutSeparator />
+                    <MenuFlyoutItem Text="動画を書き出す…" Click="Export_Click" />
+                    <MenuFlyoutSeparator />
+                    <MenuFlyoutItem Text="設定…" Click="Settings_Click" />
+                </MenuBarItem>
+                <MenuBarItem Title="編集">
+                    <MenuFlyoutItem Text="字幕を追加…" Click="AddSubtitle_Click" />
+                    <MenuFlyoutItem Text="字幕を編集…" Click="EditSubtitle_Click" />
+                    <MenuFlyoutSeparator />
+                    <MenuFlyoutItem Text="元に戻す" Click="Undo_Click" />
+                    <MenuFlyoutItem Text="設定の変更を適用" Click="Apply_Click" />
+                    <MenuFlyoutItem Text="再生位置で分割" Click="Split_Click" />
+                    <MenuFlyoutItem Text="選択クリップを削除" Click="Delete_Click" />
+                </MenuBarItem>
+                <MenuBarItem Title="再生">
+                    <MenuFlyoutItem Text="再生 / 一時停止" Click="PlayPause_Click" />
+                    <MenuFlyoutItem Text="停止" Click="Stop_Click" />
+                    <MenuFlyoutItem Text="プレビュー更新" Click="Refresh_Click" />
+                </MenuBarItem>
+            </MenuBar>
+            <Grid x:Name="TitleDragRegion" Grid.Column="2" Background="Transparent" />
+        </Grid>
+        <Frame x:Name="MainFrame" Grid.Row="1" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch">
+            <Frame.ContentTransitions>
+                <TransitionCollection><NavigationThemeTransition /></TransitionCollection>
+            </Frame.ContentTransitions>
+        </Frame>
+        <ScrollViewer x:Name="SettingsPage" Grid.Row="1" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Top" SizeChanged="SettingsPage_SizeChanged" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" />
+        <Grid x:Name="Workspace" Grid.Row="1" Background="Transparent" Padding="8,8,8,0" SizeChanged="Workspace_SizeChanged">
+            <Grid.Resources>
+                <Style x:Key="VerticalDividerStyle" TargetType="local:PanelDivider">
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="local:PanelDivider">
+                                <Grid Background="Transparent">
+                                    <Border Background="{ThemeResource ControlStrokeColorDefaultBrush}" Width="1" HorizontalAlignment="Center" />
+                                </Grid>
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
+                </Style>
+                <Style x:Key="HorizontalDividerStyle" TargetType="local:PanelDivider">
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="local:PanelDivider">
+                                <Grid Background="Transparent">
+                                    <Border Background="{ThemeResource ControlStrokeColorDefaultBrush}" Height="1" VerticalAlignment="Center" />
+                                </Grid>
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
+                </Style>
+            </Grid.Resources>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*" />
+                <RowDefinition Height="8" />
+                <RowDefinition Height="288" x:Name="TimelineRow" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="240" x:Name="WorkspaceColumn" />
+                <ColumnDefinition Width="8" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="8" />
+                <ColumnDefinition Width="280" x:Name="InspectorColumn" />
+            </Grid.ColumnDefinitions>
+            <Grid Grid.Row="0" RowSpacing="8">
+                <Grid.Resources>
+                    <Style x:Key="WorkspaceButtonStyle" TargetType="Button" BasedOn="{StaticResource DefaultButtonStyle}">
+                        <Setter Property="Background" Value="Transparent" />
+                        <Setter Property="BorderThickness" Value="0" />
+                        <Setter Property="Padding" Value="8" />
+                    </Style>
+                </Grid.Resources>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <Grid ColumnSpacing="8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Text="ワークスペース" FontWeight="SemiBold" VerticalAlignment="Center" />
+                    <Button Grid.Column="1" Style="{StaticResource WorkspaceButtonStyle}" Click="WorkspaceRefresh_Click" AutomationProperties.Name="ワークスペースを更新" ToolTipService.ToolTip="更新"><FontIcon Glyph="&#xE72C;" FontSize="16" /></Button>
+                    <Button Grid.Column="2" Style="{StaticResource WorkspaceButtonStyle}" Click="WorkspaceParent_Click" AutomationProperties.Name="上のフォルダー" ToolTipService.ToolTip="上のフォルダー">
+                        <FontIcon Glyph="" FontSize="16" />
+                    </Button>
+                    <Button Grid.Column="3" Style="{StaticResource WorkspaceButtonStyle}" Click="ChooseWorkspace_Click" AutomationProperties.Name="ワークスペースを選択" ToolTipService.ToolTip="ワークスペースを選択">
+                        <FontIcon Glyph="" FontSize="16" />
+                    </Button>
+                </Grid>
+                <TextBlock x:Name="WorkspacePath" Grid.Row="1" TextTrimming="CharacterEllipsis" />
+                <ListView x:Name="WorkspaceFiles" Grid.Row="2" DoubleTapped="WorkspaceFiles_DoubleTapped">
+                    <ListView.ItemTemplate>
+                        <DataTemplate x:DataType="local:WorkspaceEntry">
+                            <Grid ColumnSpacing="8" HorizontalAlignment="Stretch">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <FontIcon Glyph="{x:Bind Icon}" FontSize="16" VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="1" Text="{x:Bind Name}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" VerticalAlignment="Center" />
+                            </Grid>
+                        </DataTemplate>
+                    </ListView.ItemTemplate>
+                </ListView>
+            </Grid>
+            <Grid Grid.Row="0" Grid.Column="2" RowSpacing="8">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid x:Name="PreviewViewport" Background="#606060" SizeChanged="PreviewViewport_SizeChanged">
+                    <Viewbox Stretch="Uniform">
+                        <Grid x:Name="VideoCanvas" Width="1920" Height="1080" Background="Black" RequestedTheme="Dark">
+                            <MediaPlayerElement x:Name="Preview" AreTransportControlsEnabled="False" />
+                            <Grid x:Name="PausedPreview" Visibility="Collapsed" IsHitTestVisible="False">
+                                <Canvas x:Name="PausedFrames" Width="1920" Height="1080" Background="Black" />
+                            </Grid>
+                        </Grid>
+                    </Viewbox>
+                    <local:PreviewInteractionCanvas x:Name="PreviewInteraction" Background="Transparent" PointerPressed="Preview_PointerPressed" PointerExited="Preview_PointerExited" PointerMoved="Preview_PointerMoved" PointerReleased="Preview_PointerReleased" PointerCanceled="Preview_PointerCanceled" PointerCaptureLost="Preview_PointerCanceled" />
+                </Grid>
+                <Grid Grid.Row="1" RowSpacing="8" ColumnSpacing="8">
+                    <Grid.Resources>
+                        <Style x:Key="TransportButtonStyle" TargetType="Button" BasedOn="{StaticResource DefaultButtonStyle}">
+                            <Setter Property="Background" Value="Transparent" />
+                            <Setter Property="BorderThickness" Value="0" />
+                            <Setter Property="Width" Value="32" />
+                            <Setter Property="Height" Value="32" />
+                            <Setter Property="Padding" Value="8" />
+                        </Style>
+                    </Grid.Resources>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock x:Name="PositionText" Text="00:00:00.00" VerticalAlignment="Center" MinWidth="96" />
+                    <Slider x:Name="PositionSlider" Grid.Column="1" Minimum="0" Maximum="1" StepFrequency="0.0333333333" ValueChanged="PositionSlider_ValueChanged" AutomationProperties.Name="再生位置" />
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                        <StackPanel.Resources>
+                            <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="Transparent" />
+                            <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="Transparent" />
+                        </StackPanel.Resources>
+                        <Button Style="{StaticResource TransportButtonStyle}" Click="Start_Click" ToolTipService.ToolTip="先頭へ" AutomationProperties.Name="先頭へ">
+                            <FontIcon Glyph="" FontSize="16" />
+                        </Button>
+                        <Button Style="{StaticResource TransportButtonStyle}" Click="PreviousFrame_Click" ToolTipService.ToolTip="1フレーム戻る（←）" AutomationProperties.Name="1フレーム戻る">
+                            <FontIcon Glyph="" FontSize="16" />
+                        </Button>
+                        <Button Style="{StaticResource TransportButtonStyle}" Click="PlayPause_Click" ToolTipService.ToolTip="再生 / 一時停止（Space）" AutomationProperties.Name="再生 / 一時停止">
+                            <FontIcon x:Name="PlayIcon" Glyph="" FontSize="16" />
+                        </Button>
+                        <Button Style="{StaticResource TransportButtonStyle}" Click="Stop_Click" ToolTipService.ToolTip="停止" AutomationProperties.Name="停止">
+                            <FontIcon Glyph="" FontSize="16" />
+                        </Button>
+                        <Button Style="{StaticResource TransportButtonStyle}" Click="NextFrame_Click" ToolTipService.ToolTip="1フレーム進む（→）" AutomationProperties.Name="1フレーム進む">
+                            <FontIcon Glyph="" FontSize="16" />
+                        </Button>
+                    </StackPanel>
+                </Grid>
+            </Grid>
+            <ScrollViewer Grid.Row="0" Grid.Column="4">
+                <StackPanel Spacing="8">
+                    <TextBlock Text="オブジェクト設定" FontWeight="SemiBold" />
+                    <TextBlock x:Name="SelectedName" Text="クリップ未選択" TextWrapping="Wrap" />
+
+                    <Grid ColumnSpacing="8" RowSpacing="8" PreviewKeyDown="ObjectSettings_PreviewKeyDown">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="104" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <TextBlock Text="開始位置（秒）" VerticalAlignment="Center" />
+                        <NumberBox x:Name="StartInput" SpinButtonPlacementMode="Inline" ValueChanged="ObjectInput_ValueChanged" ValidationMode="Disabled" Grid.Column="1" Minimum="0" Value="0" SmallChange="0.1" AutomationProperties.Name="開始位置（秒）" />
+                        <TextBlock Grid.Row="1" Text="素材開始（秒）" VerticalAlignment="Center" />
+                        <NumberBox x:Name="TrimInput" SpinButtonPlacementMode="Inline" ValueChanged="ObjectInput_ValueChanged" ValidationMode="Disabled" Grid.Row="1" Grid.Column="1" Minimum="0" Value="0" SmallChange="0.1" AutomationProperties.Name="素材開始（秒）" />
+                        <TextBlock Grid.Row="2" Text="長さ（秒）" VerticalAlignment="Center" />
+                        <NumberBox x:Name="DurationInput" SpinButtonPlacementMode="Inline" ValueChanged="ObjectInput_ValueChanged" ValidationMode="Disabled" Grid.Row="2" Grid.Column="1" Minimum="0.0333333333333333" Value="5" SmallChange="0.1" AutomationProperties.Name="長さ（秒）" />
+                        <TextBlock Grid.Row="3" Text="レイヤー" VerticalAlignment="Center" />
+                        <NumberBox x:Name="LayerInput" SmallChange="1" LargeChange="1" SpinButtonPlacementMode="Inline" ValueChanged="ObjectInput_ValueChanged" ValidationMode="Disabled" Grid.Row="3" Grid.Column="1" Minimum="1" Maximum="8" Value="1" AutomationProperties.Name="レイヤー" />
+                        <TextBlock Grid.Row="4" Text="音量" VerticalAlignment="Center" />
+                        <NumberBox x:Name="VolumeInput" SpinButtonPlacementMode="Inline" ValueChanged="ObjectInput_ValueChanged" ValidationMode="Disabled" Grid.Row="4" Grid.Column="1" Minimum="0" Maximum="1" Value="1" SmallChange="0.1" AutomationProperties.Name="音量" />
+                    </Grid>
+                    <StackPanel x:Name="SubtitleInspector" Visibility="Collapsed" Spacing="8">
+                        <TextBox x:Name="SubtitleTextInput" Header="字幕テキスト" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="96" MaxLength="10000" />
+                        <ContentControl x:Name="SubtitleStyleHost" HorizontalContentAlignment="Stretch" />
+                        <Button Content="字幕の変更を適用" Click="Apply_Click" />
+                    </StackPanel>
+                </StackPanel>
+            </ScrollViewer>
+            <Grid Grid.Row="2" Grid.ColumnSpan="5">
+                <ScrollViewer x:Name="TimelineScroll" IsTabStop="True" HorizontalContentAlignment="Left" VerticalContentAlignment="Top" SizeChanged="TimelineScroll_SizeChanged" Grid.Row="0" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" HorizontalScrollMode="Enabled" VerticalScrollMode="Enabled">
+                    <Canvas x:Name="Timeline" Width="1800" Height="352" Background="{ThemeResource ControlFillColorDefaultBrush}" RightTapped="Timeline_RightTapped" PointerPressed="Timeline_PointerPressed" PointerMoved="Timeline_PointerMoved" PointerReleased="Timeline_PointerReleased" PointerCanceled="Timeline_PointerCanceled" PointerCaptureLost="Timeline_PointerCanceled" />
+                </ScrollViewer>
+            </Grid>
+            <Grid Grid.Row="3" Grid.ColumnSpan="5" ColumnSpacing="8" x:Name="StatusBar">
+                <Grid.Resources>
+                    <Style x:Key="StatusButtonStyle" TargetType="Button" BasedOn="{StaticResource DefaultButtonStyle}">
+                        <Setter Property="Background" Value="Transparent" />
+                        <Setter Property="BorderThickness" Value="0" />
+                        <Setter Property="Padding" Value="8,4" />
+                        <Setter Property="Margin" Value="0,4" />
+                        <Setter Property="VerticalAlignment" Value="Center" />
+                    </Style>
+                </Grid.Resources>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <Button Style="{StaticResource StatusButtonStyle}" Click="SeekPosition_Click" ToolTipService.ToolTip="指定した秒数へ移動" AutomationProperties.Name="指定した秒数へ移動"><TextBlock x:Name="TimelinePositionStatus" /></Button>
+                <TextBlock x:Name="Status" Grid.Column="1" Text="準備完了" TextTrimming="CharacterEllipsis" Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4">
+                    <Button Style="{StaticResource StatusButtonStyle}" Click="McpConnection_Click" ToolTipService.ToolTip="生成AIへの接続" AutomationProperties.Name="生成AIへの接続"><TextBlock x:Name="McpPortStatus" /></Button>
+                    <Button Style="{StaticResource StatusButtonStyle}" Click="ChooseWorkspace_Click" ToolTipService.ToolTip="ワークスペースを選択" AutomationProperties.Name="ワークスペースを選択"><TextBlock x:Name="WorkspaceStatus" MaxWidth="200" TextTrimming="CharacterEllipsis" /></Button>
+                    <Button Style="{StaticResource StatusButtonStyle}" Click="VideoSettings_Click" ToolTipService.ToolTip="解像度を変更" AutomationProperties.Name="解像度を変更"><TextBlock x:Name="ResolutionStatus" /></Button>
+                    <Button Style="{StaticResource StatusButtonStyle}" Click="VideoSettings_Click" ToolTipService.ToolTip="フレームレートを変更" AutomationProperties.Name="フレームレートを変更"><TextBlock x:Name="FrameRateStatus" /></Button>
+                    <Button Style="{StaticResource StatusButtonStyle}" Click="VideoSettings_Click" ToolTipService.ToolTip="音声周波数を変更" AutomationProperties.Name="音声周波数を変更"><TextBlock x:Name="SampleRateStatus" /></Button>
+                </StackPanel>
+            </Grid>
+            <local:PanelDivider Tag="workspace" Grid.Column="1" Grid.Row="0" Style="{StaticResource VerticalDividerStyle}" DragStarted="Divider_DragStarted" DragDelta="Divider_DragDelta" DragCompleted="Divider_DragCompleted" AutomationProperties.Name="ワークスペースの境界" />
+            <local:PanelDivider Tag="inspector" Grid.Column="3" Grid.Row="0" Style="{StaticResource VerticalDividerStyle}" DragStarted="Divider_DragStarted" DragDelta="Divider_DragDelta" DragCompleted="Divider_DragCompleted" AutomationProperties.Name="設定パネルの境界" />
+            <local:PanelDivider Tag="timeline" Grid.Column="0" Grid.Row="1" Style="{StaticResource HorizontalDividerStyle}" DragStarted="Divider_DragStarted" DragDelta="Divider_DragDelta" DragCompleted="Divider_DragCompleted" AutomationProperties.Name="タイムラインの境界" Grid.ColumnSpan="5" IsHorizontal="True" />
+        </Grid>
+    </Grid>
+    </Viewbox></Grid>
+</Window>
+
+
+
+
+
+
+
+
+
+
+
+

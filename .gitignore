@@ -1,0 +1,7 @@
+bin/
+obj/
+.vs/
+*.user
+*.hve
+*.mp4
+artifacts/

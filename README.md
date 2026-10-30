@@ -1,6 +1,8 @@
 # Hikari Video Editor
 
-WinUI 3 / C# / .NET 8 で作成した Windows x64 用の動画編集アプリです。AviUtl ExEdit2 のスクリーンショットと付属説明書を参考にした独立実装です。AviUtl のコード・画像・DLL は含めていません。
+生成 AI に接続可能な、WinUI 3 / C# / .NET 8 で作成した Windows x64 用の動画編集アプリです。
+
+<img width="600" src="https://github.com/user-attachments/assets/6a1b72ce-b3df-4f32-a02e-0fb063b04e88" />
 
 ## ビルドと起動
 
@@ -93,7 +95,7 @@ PowerShellクライアントは従来のメソッド名をMCPツール名に変�
 
 ## 現在の範囲
 
-これは基本的な編集を行う初期実装です。AviUtl の完全な再現・互換アプリではありません。独自プラグイン、Lua スクリプト、`.aup2`、エフェクト、キーフレーム、波形表示には未対応です。元実行ファイルの高水準ソースへの逆コンパイルは実施していません。バイナリ確認の範囲は `analysis/README.md` を参照してください。
+これは基本的な編集を行う初期実装です。元実行ファイルの高水準ソースへの逆コンパイルは実施していません。バイナリ確認の範囲は `analysis/README.md` を参照してください。
 
 ## パネルの境界と外観
 

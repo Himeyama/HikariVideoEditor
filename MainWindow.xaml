@@ -38,6 +38,8 @@
                     <MenuFlyoutItem Text="設定の変更を適用" Click="Apply_Click" />
                     <MenuFlyoutItem Text="再生位置で分割" Click="Split_Click" />
                     <MenuFlyoutItem Text="選択クリップを削除" Click="Delete_Click" />
+                    <MenuFlyoutItem Text="リップル削除（同じレイヤーを詰める）" Click="RippleDelete_Click" />
+                    <MenuFlyoutItem Text="全レイヤーの空白を詰める" Click="CloseGaps_Click" />
                 </MenuBarItem>
                 <MenuBarItem Title="再生">
                     <MenuFlyoutItem Text="再生 / 一時停止" Click="PlayPause_Click" />
@@ -218,6 +220,14 @@
                         <TextBlock Grid.Row="4" Text="音量" VerticalAlignment="Center" />
                         <NumberBox x:Name="VolumeInput" SpinButtonPlacementMode="Inline" ValueChanged="ObjectInput_ValueChanged" ValidationMode="Disabled" Grid.Row="4" Grid.Column="1" Minimum="0" Maximum="1" Value="1" SmallChange="0.1" AutomationProperties.Name="音量" />
                     </Grid>
+                    <StackPanel x:Name="AudioInspector" Spacing="8" Visibility="Collapsed" PreviewKeyDown="ObjectSettings_PreviewKeyDown">
+                        <NumberBox x:Name="FadeInInput" Header="音声フェードイン（秒）" Minimum="0" Maximum="86400" Value="0" SmallChange="0.1" SpinButtonPlacementMode="Inline" ValidationMode="Disabled" ValueChanged="ObjectInput_ValueChanged" />
+                        <NumberBox x:Name="FadeOutInput" Header="音声フェードアウト（秒）" Minimum="0" Maximum="86400" Value="0" SmallChange="0.1" SpinButtonPlacementMode="Inline" ValidationMode="Disabled" ValueChanged="ObjectInput_ValueChanged" />
+                        <Button Content="音声設定を適用" Click="Apply_Click" />
+                    </StackPanel>
+                    <TextBlock Text="音量ピーク（推定）" />
+                    <ProgressBar x:Name="AudioMeter" Minimum="-60" Maximum="0" Value="-60" />
+                    <TextBlock x:Name="AudioMeterText" Text="−∞ dBFS" ToolTipService.ToolTip="解析した10msごとのピークを音量・フェード設定に合わせて合算した推定値です。重なった音声の位相や出力デバイスの音量は含みません。" />
                     <StackPanel x:Name="SubtitleInspector" Visibility="Collapsed" Spacing="8">
                         <TextBox x:Name="SubtitleTextInput" Header="字幕テキスト" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="96" MaxLength="10000" />
                         <ContentControl x:Name="SubtitleStyleHost" HorizontalContentAlignment="Stretch" />

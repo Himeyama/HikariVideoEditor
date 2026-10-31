@@ -122,7 +122,7 @@ public sealed partial class MainWindow
         if (visual == null || !gate.Wait(0))
             return;
         var clip = project.Clips.FirstOrDefault(item => item.Id == visual.Clip.Id && playhead >= item.Start && playhead < item.Start + item.Duration);
-        if (clip == null || !PreviewInteraction.CapturePointer(e.Pointer))
+        if (clip == null || project.Layer(clip.Layer).Locked || !PreviewInteraction.CapturePointer(e.Pointer))
         {
             gate.Release();
             return;

@@ -118,7 +118,10 @@ public sealed partial class MainWindow
     {
         var next = project.Copy();
         foreach (var candidate in candidates)
+        {
+            project.RequireEditable(project.Clips.Single(clip => clip.Id == candidate.Id).Layer, candidate.Layer);
             next.Clips[next.Clips.FindIndex(clip => clip.Id == candidate.Id)] = candidate;
+        }
         await CompositionBuilder.Build(next);
         Remember();
         project = next;

@@ -15,7 +15,7 @@ public sealed partial class MainWindow
 {
     private double PixelsPerSecond = 48; // DIPs, never physical pixels.
     private readonly Canvas timelineRuler = new() { IsHitTestVisible = false };
-    private const double TrackLeft = 96;
+    private const double TrackLeft = 152;
     private const double RulerHeight = 32;
     private const double TrackHeight = 40;
     private readonly DispatcherTimer playbackTimer = new()
@@ -84,6 +84,7 @@ public sealed partial class MainWindow
         });
         playbackTimer.Tick += (_, _) =>
         {
+            UpdateAudioMeter();
             if (scrubPointer == null && !previewOpening && player.Source != null && (player.PlaybackSession.PlaybackState == MediaPlaybackState.Playing || (!stillWorker && PausedPreview.Visibility != Visibility.Visible)))
                 UpdatePosition(player.PlaybackSession.Position.TotalSeconds);
             PlayIcon.Glyph = player.PlaybackSession.PlaybackState == MediaPlaybackState.Playing ? "\uE769" : "\uE768";
@@ -291,11 +292,7 @@ public sealed partial class MainWindow
         Timeline.Height = RulerHeight + project.LayerCount * TrackHeight;
         for (int i = 0; i < project.LayerCount; i++)
         {
-            var label = new TextBlock
-            {
-                Text = $"レイヤー {i + 1}",
-                Margin = new Thickness(8)
-            };
+            var label = LayerHeader(i + 1);
             Canvas.SetTop(label, RulerHeight + i * TrackHeight);
             Timeline.Children.Add(label);
             var line = new Rectangle
@@ -321,11 +318,13 @@ public sealed partial class MainWindow
                 Background = ObjectAppearance.Brush(clip),
                 Tag = clip.Id
             };
+            view.Opacity = project.Layer(clip.Layer).Hidden ? .35 : project.Layer(clip.Layer).Locked ? .65 : 1;
+            AddWaveform(view, clip);
             view.Children.Add(new TextBlock {
                 Text = (clip.Kind == "audio" ? "♪ " : clip.Kind == "subtitle" ? "字幕: " : "") + clip.ToString(),
                 Foreground = new SolidColorBrush(Microsoft.UI.Colors.White),
                 Margin = new Thickness(8, 0, 8, 0),
-                VerticalAlignment = VerticalAlignment.Center,
+                VerticalAlignment = clip.Kind is "audio" or "video" ? VerticalAlignment.Top : VerticalAlignment.Center,
                 TextTrimming = TextTrimming.CharacterEllipsis,
                 IsHitTestVisible = false
             });
@@ -473,6 +472,8 @@ public sealed partial class MainWindow
         try
         {
             var clip = project.Clips.Single(c => c.Id == (string)view.Tag);
+            project.RequireEditable(clip.Layer);
+            project.RequireEditable(project.Clips.Where(c => selectedIds.Contains(c.Id)).Select(c => c.Layer).ToArray());
             var local = e.GetCurrentPoint(view).Position.X;
             var state = new DragState
             {
@@ -612,6 +613,7 @@ public sealed partial class MainWindow
         var index = next.Clips.FindIndex(c => c.Id == id);
         if (index < 0)
             throw new ArgumentException("クリップを選択してください。");
+        project.RequireEditable(next.Clips[index].Layer);
         var parts = ClipEditing.Split(next.Clips[index], seconds);
         next.Clips[index] = parts.Left;
         next.Clips.Insert(index + 1, parts.Right);

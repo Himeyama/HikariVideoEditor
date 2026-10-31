@@ -13,7 +13,7 @@ public static class CompositionBuilder
         var composition = new MediaComposition();
         var end = project.Clips.Count == 0 ? 1 : Math.Max(1, project.Clips.Max(c => c.Start + c.Duration));
         composition.Clips.Add(MediaClip.CreateFromColor(Color.FromArgb(255, 0, 0, 0), TimeSpan.FromSeconds(end)));
-        foreach (var layer in project.Clips.Where(c => c.Kind != "audio").GroupBy(c => c.Layer).OrderByDescending(g => g.Key))
+        foreach (var layer in project.Clips.Where(c => c.Kind != "audio" && !project.Layer(c.Layer).Hidden).GroupBy(c => c.Layer).OrderByDescending(g => g.Key))
         {
             var overlayLayer = new MediaOverlayLayer();
             foreach (var item in layer.OrderBy(c => c.Start))
@@ -28,7 +28,7 @@ public static class CompositionBuilder
                     clip.TrimTimeFromEnd = clip.OriginalDuration - TimeSpan.FromSeconds(item.Trim + item.Duration);
                 }
 
-                clip.Volume = item.Volume;
+                clip.Volume = project.Layer(item.Layer).Muted || item.FadeIn > 0 || item.FadeOut > 0 ? 0 : item.Volume;
                 double width, height;
                 if (item.IsStill)
                 {
@@ -58,13 +58,15 @@ public static class CompositionBuilder
             composition.OverlayLayers.Add(overlayLayer);
         }
 
-        foreach (var item in project.Clips.Where(c => c.Kind == "audio"))
+        foreach (var item in project.Clips.Where(c => (c.Kind == "audio" || c.Kind == "video" && (c.FadeIn > 0 || c.FadeOut > 0)) && !project.Layer(c.Layer).Muted && !project.Layer(c.Layer).Hidden))
         {
-            var audio = await BackgroundAudioTrack.CreateFromFileAsync(await StorageFile.GetFileFromPathAsync(SubtitleRenderer.SourcePath(item, project.Video)));
-            if (item.Trim + item.Duration > audio.OriginalDuration.TotalSeconds + .02)
+            bool faded = item.FadeIn > 0 || item.FadeOut > 0;
+            var audio = await BackgroundAudioTrack.CreateFromFileAsync(await StorageFile.GetFileFromPathAsync(faded ? await AudioAnalysis.Faded(item) : item.Path));
+            double trim = faded ? 0 : item.Trim;
+            if (trim + item.Duration > audio.OriginalDuration.TotalSeconds + .02)
                 throw new ArgumentException($"音声の長さを超えています: {item}");
-            audio.TrimTimeFromStart = TimeSpan.FromSeconds(item.Trim);
-            audio.TrimTimeFromEnd = audio.OriginalDuration - TimeSpan.FromSeconds(item.Trim + item.Duration);
+            audio.TrimTimeFromStart = TimeSpan.FromSeconds(trim);
+            audio.TrimTimeFromEnd = TimeSpan.FromSeconds(Math.Max(0, audio.OriginalDuration.TotalSeconds - trim - item.Duration));
             audio.Delay = TimeSpan.FromSeconds(item.Start);
             audio.Volume = item.Volume;
             composition.BackgroundAudioTracks.Add(audio);

@@ -31,7 +31,7 @@ public sealed partial class MainWindow
         };
         delete.Click += (_, _) =>
         {
-            selected = clip.Id;
+            Select(clip, preserveSelection: selectedIds.Contains(clip.Id));
             Delete_Click(this, new RoutedEventArgs());
         };
         menu.Items.Add(CreateAddSubtitleItem(playhead, clip.Layer));
@@ -47,12 +47,20 @@ public sealed partial class MainWindow
         else menu.Items.Add(open);
         menu.Items.Add(new MenuFlyoutSeparator());
         menu.Items.Add(delete);
+        var ripple = new MenuFlyoutItem { Text = "リップル削除（同じレイヤーを詰める）" };
+        ripple.Click += async (_, _) => await Run(async () =>
+        {
+            Select(clip, preserveSelection: selectedIds.Contains(clip.Id));
+            await DeleteSelection(true);
+        });
+        menu.Items.Add(ripple);
         return menu;
     }
 
     private async Task<EditClip> DuplicateClip(string id)
     {
         var original = project.Clips.Single(clip => clip.Id == id);
+        project.RequireEditable(original.Layer);
         var duplicate = ClipEditing.Duplicate(original);
         var next = project.Copy();
         next.Clips.Add(duplicate);

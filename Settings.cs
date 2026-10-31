@@ -88,6 +88,7 @@ public sealed partial class MainWindow
     private async Task EditSubtitle(string? id, double? insertionTime = null, int? insertionLayer = null)
     {
         var original = project.Clips.FirstOrDefault(c => c.Id == id);
+        if (original != null) project.RequireEditable(original.Layer);
         var text = new TextBox { Text = original?.Text ?? "", AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, Height = 112, MaxLength = 10000, Header = "字幕テキスト（必須）", PlaceholderText = "表示する字幕を入力" };
         var start = SubtitleSettingsEditor.Number(original?.Start ?? insertionTime ?? playhead, 0, 86400);
         var duration = SubtitleSettingsEditor.Number(original?.Duration ?? 5, ClipEditing.MinimumDuration, 86400);
@@ -122,6 +123,7 @@ public sealed partial class MainWindow
                 if (original == null)
                     clip.Layer = insertionLayer ?? Math.Min(2000, project.LayerCount);
                 clip.Validate();
+                project.RequireEditable(clip.Layer);
                 var next = project.Copy();
                 next.Clips.RemoveAll(c => c.Id == clip.Id);
                 next.Clips.Add(clip);

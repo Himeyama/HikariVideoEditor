@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0-windows10.0.19041.0</TargetFramework><RuntimeIdentifier>win-x64</RuntimeIdentifier><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable></PropertyGroup>
  <ItemGroup><Compile Include="../../ClipGeometry.cs" Link="ClipGeometry.cs"/><Compile Include="../../StillPreview.cs" Link="StillPreview.cs"/><Compile Include="../../CompositionBuilder.cs" Link="CompositionBuilder.cs"/><Compile Include="../../ClipEditing.cs" Link="ClipEditing.cs"/><Compile Include="../../VideoExport.cs" Link="VideoExport.cs"/><Compile Include="../../Project.cs" Link="Project.cs"/></ItemGroup>
-<ItemGroup><FrameworkReference Include="Microsoft.WindowsDesktop.App.WindowsForms" /></ItemGroup><ItemGroup><Compile Include="../../AppPreferences.cs" Link="AppPreferences.cs"/><Compile Include="../../SubtitleRenderer.cs" Link="SubtitleRenderer.cs"/></ItemGroup></Project>
+<ItemGroup><FrameworkReference Include="Microsoft.WindowsDesktop.App.WindowsForms" /></ItemGroup><ItemGroup><Compile Include="../../AppPreferences.cs" Link="AppPreferences.cs"/><Compile Include="../../SubtitleRenderer.cs" Link="SubtitleRenderer.cs"/></ItemGroup><ItemGroup><Compile Include="../../AudioAnalysis.cs" Link="AudioAnalysis.cs"/><Compile Include="../../PcmAudio.cs" Link="PcmAudio.cs"/></ItemGroup></Project>
 
 

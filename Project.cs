@@ -7,8 +7,15 @@ public sealed class EditProject
     public string? WorkspaceDirectory { get; set; }
     public VideoSettings Video { get; set; } = new();
     public List<EditClip> Clips { get; set; } = [];
+    public Dictionary<int, LayerSettings> Layers { get; set; } = [];
+    public LayerSettings Layer(int number) => Layers.TryGetValue(number, out var settings) ? settings : new();
+    public void RequireEditable(params int[] layers)
+    {
+        if (layers.Any(number => Layer(number).Locked))
+            throw new ArgumentException("ロックされたレイヤーは編集できません。先にロックを解除してください。");
+    }
     [System.Text.Json.Serialization.JsonIgnore]
-    public int LayerCount => Math.Max(8, Clips.Select(c => c.Layer + 1).DefaultIfEmpty(8).Max());
+    public int LayerCount => Math.Min(2000, Math.Max(8, Math.Max(Clips.Select(c => c.Layer + 1).DefaultIfEmpty(8).Max(), Layers.Keys.DefaultIfEmpty(1).Max())));
 
     public EditProject Copy() => JsonSerializer.Deserialize<EditProject>(JsonSerializer.Serialize(this))!;
     public void Validate()
@@ -16,6 +23,8 @@ public sealed class EditProject
         if (Version != 1 || Clips.Count > 2000)
             throw new ArgumentException("未対応のプロジェクトです。");
         Video.Validate();
+        if (Layers.Any(pair => pair.Key is < 1 or > 2000 || pair.Value == null))
+            throw new ArgumentException("レイヤー設定が不正です。");
         if (Clips.Select(c => c.Id).Distinct().Count() != Clips.Count)
             throw new ArgumentException("クリップIDが重複しています。");
         foreach (var c in Clips)
@@ -33,6 +42,11 @@ public sealed class EditClip
     public double Duration { get; set; } = 5;
     public int Layer { get; set; } = 1;
     public double Volume { get; set; } = 1;
+    public double FadeIn { get; set; }
+    public double FadeOut { get; set; }
+    public double AudioGain(double localSeconds) => Math.Clamp(Math.Min(
+        FadeIn > 0 ? localSeconds / FadeIn : 1,
+        FadeOut > 0 ? (Duration - localSeconds) / FadeOut : 1), 0, 1);
     public double OffsetX { get; set; }
     public double OffsetY { get; set; }
     public double Scale { get; set; } = 1;
@@ -49,6 +63,8 @@ public sealed class EditClip
     public override string ToString() => Kind == "subtitle" ? Text.ReplaceLineEndings(" ") : System.IO.Path.GetFileName(Path);
     public void Validate(int? frameRate = null)
     {
+        if (!double.IsFinite(FadeIn) || !double.IsFinite(FadeOut) || FadeIn < 0 || FadeOut < 0 || FadeIn > 86400 || FadeOut > 86400)
+            throw new ArgumentException("音声フェードの秒数が不正です。");
         if (!double.IsFinite(OffsetX) || !double.IsFinite(OffsetY) || !double.IsFinite(Scale) || Scale is < 0.01 or > 100 || !double.IsFinite(ScaleX) || !double.IsFinite(ScaleY) || ScaleX is < 0.01 or > 100 || ScaleY is < 0.01 or > 100 || Math.Abs(OffsetX) > 1000000 || Math.Abs(OffsetY) > 1000000)
             throw new ArgumentException("素材の位置・拡大率が不正です。");
         if (Kind == "subtitle")
@@ -64,6 +80,13 @@ public sealed class EditClip
         if (!double.IsFinite(Start) || !double.IsFinite(Trim) || !double.IsFinite(Duration) || !double.IsFinite(Volume) || Start < 0 || Trim < 0 || Duration < 1.0 / (frameRate ?? ClipEditing.FrameRate) - 1e-8 || Start + Duration > 86400 || Layer is < 1 or > 2000 || Volume is < 0 or > 1)
             throw new ArgumentException("クリップの時間・レイヤー・音量が不正です。");
     }
+}
+
+public sealed class LayerSettings
+{
+    public bool Locked { get; set; }
+    public bool Hidden { get; set; }
+    public bool Muted { get; set; }
 }
 
 public sealed class VideoSettings

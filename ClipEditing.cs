@@ -130,6 +130,8 @@ public static class ClipEditing
         Duration = clip.Duration,
         Layer = clip.Layer,
         Volume = clip.Volume,
+        FadeIn = clip.FadeIn,
+        FadeOut = clip.FadeOut,
         OffsetX = clip.OffsetX,
         OffsetY = clip.OffsetY,
         Text = clip.Text,

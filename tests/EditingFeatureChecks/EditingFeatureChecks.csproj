@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0-windows10.0.19041.0</TargetFramework><RuntimeIdentifier>win-x64</RuntimeIdentifier><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable></PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.WindowsDesktop.App.WindowsForms" />
+    <Compile Include="../../Project.cs" Link="Project.cs" />
+    <Compile Include="../../AppPreferences.cs" Link="AppPreferences.cs" />
+    <Compile Include="../../ClipEditing.cs" Link="ClipEditing.cs" />
+    <Compile Include="../../ClipGeometry.cs" Link="ClipGeometry.cs" />
+    <Compile Include="../../TimelineOperations.cs" Link="TimelineOperations.cs" />
+    <Compile Include="../../PcmAudio.cs" Link="PcmAudio.cs" />
+    <Compile Include="../../AudioAnalysis.cs" Link="AudioAnalysis.cs" />
+    <Compile Include="../../CompositionBuilder.cs" Link="CompositionBuilder.cs" />
+    <Compile Include="../../SubtitleRenderer.cs" Link="SubtitleRenderer.cs" />
+    <Compile Include="../../StillPreview.cs" Link="StillPreview.cs" />
+  </ItemGroup>
+</Project>

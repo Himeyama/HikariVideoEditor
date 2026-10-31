@@ -30,13 +30,15 @@ public sealed partial class MainWindow
 
     private void DisplayObjectValues(EditClip clip)
     {
+        AudioInspector.Visibility = clip.Kind is "audio" or "video" ? Visibility.Visible : Visibility.Collapsed;
         displayingObjectValues = true;
         try
         {
         foreach (var (input, value) in new[]
         {
             (StartInput, clip.Start), (TrimInput, clip.Trim), (DurationInput, clip.Duration),
-            (LayerInput, (double)clip.Layer), (VolumeInput, clip.Volume)
+            (LayerInput, (double)clip.Layer), (VolumeInput, clip.Volume),
+            (FadeInInput, clip.FadeIn), (FadeOutInput, clip.FadeOut)
         })
         {
             input.Value = value;
@@ -73,6 +75,7 @@ public sealed partial class MainWindow
             if (expectedId != null && selected != expectedId) return;
             original = project.Clips.FirstOrDefault(clip => clip.Id == selected)
                 ?? throw new ArgumentException("クリップを選択してください。");
+            project.RequireEditable(original.Layer);
 
             double Read(NumberBox input, double previous, string label)
             {
@@ -108,6 +111,9 @@ public sealed partial class MainWindow
             edit.Duration = Read(DurationInput, original.Duration, "長さ");
             edit.Layer = checked((int)Read(LayerInput, original.Layer, "レイヤー"));
             edit.Volume = Read(VolumeInput, original.Volume, "音量");
+            edit.FadeIn = Read(FadeInInput, original.FadeIn, "フェードイン");
+            edit.FadeOut = Read(FadeOutInput, original.FadeOut, "フェードアウト");
+            project.RequireEditable(edit.Layer);
             if (edit.Kind == "subtitle" && releaseFocus && objectSubtitleEditor != null)
             {
                 edit.Text = SubtitleTextInput.Text;
@@ -176,7 +182,8 @@ public sealed partial class MainWindow
         }
         var clip = project.Clips.Single(c => c.Id == selected);
         double existing = sender == StartInput ? clip.Start : sender == TrimInput ? clip.Trim :
-            sender == DurationInput ? clip.Duration : sender == LayerInput ? clip.Layer : clip.Volume;
+            sender == DurationInput ? clip.Duration : sender == LayerInput ? clip.Layer :
+            sender == FadeInInput ? clip.FadeIn : sender == FadeOutInput ? clip.FadeOut : clip.Volume;
         if (normalized == existing) return;
         pendingObjectStep = (selected, sender, normalized);
         if (processingObjectSteps) return;

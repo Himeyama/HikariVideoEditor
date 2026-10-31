@@ -62,9 +62,9 @@ Near(enlargedBounds.X, bounds.X); Near(enlargedBounds.Y, bounds.Y); Near(enlarge
 Near(enlargedBounds.Width / enlargedBounds.Height, bounds.Width / bounds.Height);
 var copiedProject = new EditProject { WorkspaceDirectory = "C:/Media", Clips = [transformed] }.Copy();
 Near(copiedProject.Clips[0].Scale, 1.5); Check(copiedProject.WorkspaceDirectory == "C:/Media");
-Check(ProjectDisplay.Position(0, 0, 30) == "00:00:00.000 | 0 / 0");
-Check(ProjectDisplay.Position(.5, 4, 30) == "00:00:00.500 | 16 / 120");
-Check(ProjectDisplay.Position(4, 4, 30) == "00:00:04.000 | 120 / 120");
+Check(ProjectDisplay.Position(0, 0, 30) == "00:00:00.000  0 / 0");
+Check(ProjectDisplay.Position(.5, 4, 30) == "00:00:00.500  16 / 120");
+Check(ProjectDisplay.Position(4, 4, 30) == "00:00:04.000  120 / 120");
 Check(ProjectDisplay.Settings(new EditProject()).Contains("1920x1080  30fps  44.1kHz"));
 Check(MediaFiles.OpenLabel("audio") == "音声を開く");
 Check(MediaFiles.OpenLabel("image") == "画像を開く");

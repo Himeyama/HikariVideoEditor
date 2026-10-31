@@ -82,6 +82,7 @@ public sealed partial class MainWindow
             case "clip.update":
                 var next = project.Copy();
                 var clip = next.Clips.Single(c => c.Id == Arg("id"));
+                project.RequireEditable(clip.Layer);
                 if (p.TryGetProperty("start", out var start))
                     clip.Start = start.GetDouble();
                 if (p.TryGetProperty("trim", out var trim))
@@ -92,6 +93,9 @@ public sealed partial class MainWindow
                     clip.Layer = layer.GetInt32();
                 if (p.TryGetProperty("volume", out var volume))
                     clip.Volume = volume.GetDouble();
+                if (p.TryGetProperty("fadeIn", out var fadeIn)) clip.FadeIn = fadeIn.GetDouble();
+                if (p.TryGetProperty("fadeOut", out var fadeOut)) clip.FadeOut = fadeOut.GetDouble();
+                project.RequireEditable(clip.Layer);
                 if (p.TryGetProperty("offsetX", out var offsetX))
                     clip.OffsetX = offsetX.GetDouble();
                 if (p.TryGetProperty("offsetY", out var offsetY))
@@ -132,6 +136,7 @@ public sealed partial class MainWindow
                 var id = Arg("id");
                 if (!project.Clips.Any(c => c.Id == id))
                     throw new ArgumentException("IDがありません。");
+                project.RequireEditable(project.Clips.Single(c => c.Id == id).Layer);
                 Remember();
                 project.Clips.RemoveAll(c => c.Id == id);
                 Draw();

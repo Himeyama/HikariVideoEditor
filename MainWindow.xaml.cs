@@ -43,6 +43,8 @@ public sealed partial class MainWindow : Window
         TrimInput.NumberFormatter = secondsFormat;
         DurationInput.NumberFormatter = secondsFormat;
         VolumeInput.NumberFormatter = secondsFormat;
+        FadeInInput.NumberFormatter = secondsFormat;
+        FadeOutInput.NumberFormatter = secondsFormat;
         LayerInput.NumberFormatter = new Windows.Globalization.NumberFormatting.DecimalFormatter { FractionDigits = 0, IntegerDigits = 1 };
         ConfigureWindow();
         ApplyAppScale();
@@ -111,7 +113,11 @@ public sealed partial class MainWindow : Window
         UpdateGenerationAvailability();
         UpdateHistoryButtons();
         ClipEditing.FrameRate = project.Video.FrameRate;
-        if (selected == null) DisplaySubtitleSettings(null);
+        if (selected == null)
+        {
+            DisplaySubtitleSettings(null);
+            AudioInspector.Visibility = Visibility.Collapsed;
+        }
         selectedIds.RemoveWhere(id => !project.Clips.Any(clip => clip.Id == id));
         UpdateVideoCanvas();
         DrawTimeline();
@@ -153,6 +159,8 @@ public sealed partial class MainWindow : Window
         }
 
         c.Validate();
+        while (project.Layer(c.Layer).Locked && c.Layer < 2000) c.Layer++;
+        project.RequireEditable(c.Layer);
         Remember();
         project.Clips.Add(c);
         Select(c);
@@ -207,15 +215,7 @@ public sealed partial class MainWindow : Window
     private async void Apply_Click(object sender, RoutedEventArgs e) => await ApplyObjectSettings(null);
     private async void Delete_Click(object sender, RoutedEventArgs e) => await Run(async () =>
     {
-        if (selected == null)
-            return;
-        Remember();
-        project.Clips.RemoveAll(c => c.Id == selected);
-        selectedIds.Clear();
-        selected = null;
-        SelectedName.Text = "クリップ未選択";
-        Draw();
-        await Refresh();
+        await DeleteSelection(false);
     });
     private async void Undo_Click(object sender, RoutedEventArgs e) => await Run(() => RestoreHistory(undo, redo));
     private async void Redo_Click(object sender, RoutedEventArgs e) => await Run(() => RestoreHistory(redo, undo));

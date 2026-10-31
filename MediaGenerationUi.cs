@@ -72,6 +72,7 @@ public sealed partial class MainWindow
             clip = new EditClip { Path = path, Kind = speech ? "audio" : "image", Start = start, Duration = duration,
                 Layer = ClipPlacement.FirstAvailableLayer(project.Clips, start, duration) };
             clip.Validate(project.Video.FrameRate);
+            project.RequireEditable(clip.Layer);
             Remember();
             project.Clips.Add(clip);
             Select(clip);

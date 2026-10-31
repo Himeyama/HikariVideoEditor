@@ -17,7 +17,7 @@ public static class StillPreview
         var frames = new List<Layer>();
         try
         {
-            foreach (var clip in project.Clips.Where(c => c.Kind != "audio" && seconds >= c.Start && seconds < c.Start + c.Duration).OrderByDescending(c => c.Layer).ThenBy(c => c.Start))
+            foreach (var clip in project.Clips.Where(c => c.Kind != "audio" && !project.Layer(c.Layer).Hidden && seconds >= c.Start && seconds < c.Start + c.Duration).OrderByDescending(c => c.Layer).ThenBy(c => c.Start))
             {
                 var file = await StorageFile.GetFileFromPathAsync(SubtitleRenderer.SourcePath(clip, project.Video));
                 if (clip.IsStill)

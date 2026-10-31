@@ -2,7 +2,12 @@ namespace VideoEditor;
 public sealed record WorkspaceEntry(string FullPath, bool IsDirectory)
 {
     public string Name => Path.GetFileName(Path.TrimEndingDirectorySeparator(FullPath));
-    public string Icon => IsDirectory ? "\uE8B7" : MediaFiles.Kind(FullPath) == "audio" ? "\uE8D6" : "\uE714";
+    public string Icon => IsDirectory ? "\uE8B7" : !MediaFiles.IsSupported(FullPath) ? "\uE8A5" : MediaFiles.Kind(FullPath) switch
+    {
+        "image" => "\uEB9F",
+        "audio" => "\uE8D6",
+        _ => "\uE714"
+    };
 
     public static List<WorkspaceEntry> ReadDirectory(string directory, bool foldersOnly = false)
     {
@@ -11,7 +16,7 @@ public sealed record WorkspaceEntry(string FullPath, bool IsDirectory)
             IgnoreInaccessible = true
         };
         var folders = Directory.EnumerateDirectories(directory, "*", options).Select(path => new WorkspaceEntry(path, true));
-        var files = foldersOnly ? Enumerable.Empty<WorkspaceEntry>() : Directory.EnumerateFiles(directory, "*", options).Where(MediaFiles.IsSupported).Select(path => new WorkspaceEntry(path, false));
+        var files = foldersOnly ? Enumerable.Empty<WorkspaceEntry>() : Directory.EnumerateFiles(directory, "*", options).Select(path => new WorkspaceEntry(path, false));
         return folders.Concat(files).OrderByDescending(entry => entry.IsDirectory).ThenBy(entry => entry.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
     }
 }

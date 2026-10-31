@@ -200,9 +200,9 @@ public sealed partial class MainWindow
         Grid.SetColumn(label, 1);
         row.Children.Add(label);
         ToolTipService.SetToolTip(row, entry.FullPath);
-        if (!entry.IsDirectory)
+        var menu = new MenuFlyout();
+        if (!entry.IsDirectory && MediaFiles.IsSupported(entry.FullPath))
         {
-            var menu = new MenuFlyout();
             var add = new MenuFlyoutItem { Text = "タイムラインに追加" };
             add.Click += async (_, _) => await Run(async () =>
             {
@@ -213,8 +213,24 @@ public sealed partial class MainWindow
             open.Click += async (_, _) => await Run(() => OpenMediaFile(entry.FullPath));
             menu.Items.Add(add);
             menu.Items.Add(open);
-            row.ContextFlyout = menu;
+            menu.Items.Add(new MenuFlyoutSeparator());
         }
+        var explorer = new MenuFlyoutItem { Text = "エクスプローラで開く" };
+        explorer.Click += async (_, _) => await Run(async () =>
+        {
+            var folder = await StorageFolder.GetFolderFromPathAsync(entry.IsDirectory ? entry.FullPath : Path.GetDirectoryName(entry.FullPath)!);
+            var options = new FolderLauncherOptions();
+            if (!entry.IsDirectory) options.ItemsToSelect.Add(await StorageFile.GetFileFromPathAsync(entry.FullPath));
+            if (!await Launcher.LaunchFolderAsync(folder, options)) throw new InvalidOperationException("エクスプローラを開けませんでした。");
+        });
+        menu.Items.Add(explorer);
+        var delete = new MenuFlyoutItem { Text = "削除" };
+        delete.Click += async (_, _) => await Run(() => DeleteWorkspaceEntry(entry));
+        menu.Items.Add(delete);
+        var rename = new MenuFlyoutItem { Text = "名前を変更" };
+        rename.Click += async (_, _) => await Run(() => RenameWorkspaceEntry(entry));
+        menu.Items.Add(rename);
+        row.ContextFlyout = menu;
         return new TreeViewNode { Content = row, IsExpanded = false, HasUnrealizedChildren = entry.IsDirectory };
     }
 
@@ -258,9 +274,60 @@ public sealed partial class MainWindow
         e.Handled = true;
         await Run(async () =>
         {
+            if (!MediaFiles.IsSupported(entry.FullPath))
+            {
+                await OpenMediaFile(entry.FullPath);
+                return;
+            }
             await Add(entry.FullPath, playhead);
             await Refresh();
         });
+    }
+
+    private IEnumerable<EditClip> WorkspaceEntryClips(WorkspaceEntry entry) => WorkspaceEntryClips(project, entry);
+
+    private static IEnumerable<EditClip> WorkspaceEntryClips(EditProject source, WorkspaceEntry entry) => source.Clips.Where(clip =>
+        clip.Kind != "subtitle" && (string.Equals(clip.Path, entry.FullPath, StringComparison.OrdinalIgnoreCase) ||
+        entry.IsDirectory && clip.Path.StartsWith(Path.TrimEndingDirectorySeparator(entry.FullPath) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)));
+
+    private async Task DeleteWorkspaceEntry(WorkspaceEntry entry)
+    {
+        if (WorkspaceEntryClips(entry).Any())
+            throw new InvalidOperationException("タイムラインで使用中の素材が含まれています。クリップを削除してから操作してください。");
+        var dialog = new ContentDialog
+        {
+            XamlRoot = Root.XamlRoot, Title = "削除の確認",
+            Content = $"「{entry.Name}」を削除しますか？" + (entry.IsDirectory ? "\nフォルダー内のファイルも削除されます。" : ""),
+            PrimaryButtonText = "削除", CloseButtonText = "キャンセル", DefaultButton = ContentDialogButton.Close
+        };
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+        // Recheck after the dialog in case the project changed while it was open.
+        if (WorkspaceEntryClips(entry).Any()) throw new InvalidOperationException("タイムラインで使用中の素材は削除できません。");
+        IStorageItem item = entry.IsDirectory ? await StorageFolder.GetFolderFromPathAsync(entry.FullPath) : await StorageFile.GetFileFromPathAsync(entry.FullPath);
+        await item.DeleteAsync(StorageDeleteOption.Default);
+        if (workspaceCurrentDirectory != null) await RefreshWorkspaceNodes(WorkspaceFiles.RootNodes, workspaceCurrentDirectory);
+    }
+
+    private async Task RenameWorkspaceEntry(WorkspaceEntry entry)
+    {
+        var input = new TextBox { Text = entry.Name, MinWidth = 300 };
+        var dialog = new ContentDialog
+        {
+            XamlRoot = Root.XamlRoot, Title = "名前を変更", Content = input,
+            PrimaryButtonText = "変更", CloseButtonText = "キャンセル", DefaultButton = ContentDialogButton.Primary
+        };
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+        string name = input.Text.Trim();
+        if (string.IsNullOrWhiteSpace(name) || name is "." or ".." || name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 || name.EndsWith('.') || name.EndsWith(' '))
+            throw new ArgumentException("有効なファイル名を入力してください。");
+        if (name == entry.Name) return;
+        var affected = WorkspaceEntryClips(entry).ToList();
+        IStorageItem item = entry.IsDirectory ? await StorageFolder.GetFolderFromPathAsync(entry.FullPath) : await StorageFile.GetFileFromPathAsync(entry.FullPath);
+        await item.RenameAsync(name, NameCollisionOption.FailIfExists);
+        foreach (var clip in affected.Concat(undo.Concat(redo).SelectMany(snapshot => WorkspaceEntryClips(snapshot, entry))))
+            clip.Path = item.Path + clip.Path[entry.FullPath.Length..];
+        if (workspaceCurrentDirectory != null) await RefreshWorkspaceNodes(WorkspaceFiles.RootNodes, workspaceCurrentDirectory);
+        if (affected.Count > 0) { Draw(); await Refresh(); }
     }
 
     private static async Task OpenMediaFile(string path)

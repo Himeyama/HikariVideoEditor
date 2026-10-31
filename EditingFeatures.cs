@@ -8,7 +8,6 @@ namespace VideoEditor;
 
 public sealed partial class MainWindow
 {
-    private readonly Dictionary<string, PcmAudio> analyzedAudio = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> failedAudio = new(StringComparer.OrdinalIgnoreCase);
 
     private async Task ApplyTimelineProject(EditProject next)
@@ -42,6 +41,8 @@ public sealed partial class MainWindow
             var button = new Microsoft.UI.Xaml.Controls.Primitives.ToggleButton
             {
                 Content = new FontIcon { Glyph = glyph, FontSize = 14 }, IsChecked = active,
+                Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent),
+                BorderBrush = new SolidColorBrush(Microsoft.UI.Colors.Transparent), BorderThickness = new Thickness(0),
                 Width = 32, Height = 32, Padding = new Thickness(4), VerticalAlignment = VerticalAlignment.Center
             };
             ToolTipService.SetToolTip(button, $"レイヤー {number}: {name}");
@@ -76,7 +77,6 @@ public sealed partial class MainWindow
         {
             var audio = await AudioAnalysis.Get(clip.Path);
             if (closed) return;
-            analyzedAudio[clip.Path] = audio;
             double width = Math.Max(16, clip.Duration * PixelsPerSecond);
             int count = Math.Clamp((int)Math.Ceiling(width / 2), 2, 2048);
             var points = new PointCollection();
@@ -95,24 +95,5 @@ public sealed partial class MainWindow
             failedAudio.Add(clip.Path);
             if (!closed && clip.Kind == "audio") ToolTipService.SetToolTip(view, $"{clip}\n音声波形を解析できませんでした。素材を確認してください。");
         }
-    }
-
-    private void UpdateAudioMeter()
-    {
-        if (AudioMeter == null) return;
-        bool playing = Preview.MediaPlayer.PlaybackSession.PlaybackState == Windows.Media.Playback.MediaPlaybackState.Playing;
-        double peak = 0;
-        bool pending = false;
-        foreach (var clip in project.Clips.Where(c => c.Kind is "audio" or "video" && !project.Layer(c.Layer).Muted && !project.Layer(c.Layer).Hidden && playhead >= c.Start && playhead < c.Start + c.Duration))
-        {
-            if (!analyzedAudio.TryGetValue(clip.Path, out var audio)) { pending |= !failedAudio.Contains(clip.Path); continue; }
-            double local = playhead - clip.Start;
-            peak += audio.Peak(clip.Trim + local, clip.Trim + Math.Min(clip.Duration, local + .033)) * clip.Volume * clip.AudioGain(local);
-        }
-        if (!playing) peak = 0;
-        double db = peak > 0 ? 20 * Math.Log10(peak) : -60;
-        AudioMeter.Value = Math.Clamp(db, -60, 0);
-        AudioMeter.Foreground = new SolidColorBrush(peak >= 1 ? Microsoft.UI.Colors.Red : Microsoft.UI.Colors.LimeGreen);
-        AudioMeterText.Text = pending ? "音声を解析中…" : peak <= 0 ? "−∞ dBFS" : $"{db:F1} dBFS（推定）{(peak >= 1 ? " / 音割れの可能性" : "")}";
     }
 }

@@ -84,7 +84,6 @@ public sealed partial class MainWindow
         });
         playbackTimer.Tick += (_, _) =>
         {
-            UpdateAudioMeter();
             if (scrubPointer == null && !previewOpening && player.Source != null && (player.PlaybackSession.PlaybackState == MediaPlaybackState.Playing || (!stillWorker && PausedPreview.Visibility != Visibility.Visible)))
                 UpdatePosition(player.PlaybackSession.Position.TotalSeconds);
             PlayIcon.Glyph = player.PlaybackSession.PlaybackState == MediaPlaybackState.Playing ? "\uE769" : "\uE768";
@@ -166,6 +165,31 @@ public sealed partial class MainWindow
 
     private async void Root_PreviewKeyDown(object sender, KeyRoutedEventArgs e)
     {
+        if (e.Key is Windows.System.VirtualKey.Delete or Windows.System.VirtualKey.F2)
+        {
+            bool workspaceFocused = false;
+            for (var current = FocusManager.GetFocusedElement(Root.XamlRoot) as DependencyObject;
+                 current != null; current = VisualTreeHelper.GetParent(current))
+            {
+                if (current is TextBox or RichEditBox or PasswordBox or NumberBox or ContentDialog)
+                    return;
+                if (ReferenceEquals(current, WorkspaceFiles)) workspaceFocused = true;
+            }
+            if (workspaceFocused)
+            {
+                if (WorkspaceFiles.SelectedNode?.Content is not FrameworkElement { Tag: WorkspaceEntry entry }) return;
+                e.Handled = true;
+                if (!e.KeyStatus.WasKeyDown && gate.CurrentCount > 0)
+                    await Run(() => e.Key == Windows.System.VirtualKey.Delete ? DeleteWorkspaceEntry(entry) : RenameWorkspaceEntry(entry));
+            }
+            else if (e.Key == Windows.System.VirtualKey.Delete && (selected != null || selectedIds.Count > 0))
+            {
+                e.Handled = true;
+                if (!e.KeyStatus.WasKeyDown && gate.CurrentCount > 0)
+                    await Run(() => DeleteSelection(false));
+            }
+            return;
+        }
         if (ControlPressed && e.Key is Windows.System.VirtualKey.Z or Windows.System.VirtualKey.Y)
         {
             var historyFocus = FocusManager.GetFocusedElement(Root.XamlRoot) as DependencyObject;
@@ -389,6 +413,7 @@ public sealed partial class MainWindow
         var point = e.GetCurrentPoint(Timeline);
         if (scrubPointer != null || drag != null || gate.CurrentCount == 0 || !point.Properties.IsLeftButtonPressed || point.Position.X < TrackLeft - 4)
             return;
+        TimelineScroll.Focus(FocusState.Programmatic);
         if (BeginMarquee(e))
             return;
         if (ControlPressed)
@@ -458,6 +483,7 @@ public sealed partial class MainWindow
     {
         if (scrubPointer != null || drag != null || marquee != null || !e.GetCurrentPoint((Grid)sender).Properties.IsLeftButtonPressed)
             return;
+        TimelineScroll.Focus(FocusState.Programmatic);
         if (ControlPressed)
         {
             BeginMarquee(e, (string)((Grid)sender).Tag);

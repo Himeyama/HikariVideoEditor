@@ -161,6 +161,14 @@ public sealed partial class MainWindow
         }
     }
 
+    private async void ObjectInput_LostFocus(object sender, RoutedEventArgs args)
+    {
+        if (sender is not NumberBox input || displayingObjectValues || applyingObjectSettings || processingObjectSteps || selected == null)
+            return;
+        if (displayedObjectValues.TryGetValue(input, out var displayed) && input.Text == displayed) return;
+        await ApplyObjectSettings(input, releaseFocus: false, expectedId: selected);
+    }
+
     private async void ObjectInput_ValueChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
     {
         if (displayingObjectValues || selected == null || !double.IsFinite(args.NewValue) ||

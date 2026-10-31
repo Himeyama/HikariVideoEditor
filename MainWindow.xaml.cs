@@ -46,6 +46,8 @@ public sealed partial class MainWindow : Window
         FadeInInput.NumberFormatter = secondsFormat;
         FadeOutInput.NumberFormatter = secondsFormat;
         LayerInput.NumberFormatter = new Windows.Globalization.NumberFormatting.DecimalFormatter { FractionDigits = 0, IntegerDigits = 1 };
+        foreach (var input in new[] { StartInput, TrimInput, DurationInput, LayerInput, VolumeInput, FadeInInput, FadeOutInput })
+            input.LostFocus += ObjectInput_LostFocus;
         ConfigureWindow();
         ApplyAppScale();
         InitializePlayback();

@@ -69,15 +69,18 @@ Check(ProjectDisplay.Settings(new EditProject()).Contains("1920x1080  30fps  44.
 Check(MediaFiles.OpenLabel("audio") == "音声を開く");
 Check(MediaFiles.OpenLabel("image") == "画像を開く");
 Check(MediaFiles.OpenLabel("video") == "動画を開く");
-string workspaceDirectory = Path.GetFullPath("artifacts/workspace-checks");
+string workspaceDirectory = Path.GetFullPath(Path.Combine("artifacts", "workspace-checks-" + Guid.NewGuid().ToString("N")));
 Directory.CreateDirectory(Path.Combine(workspaceDirectory, "Child"));
 File.WriteAllText(Path.Combine(workspaceDirectory, "sample.mp4"), "");
 File.WriteAllText(Path.Combine(workspaceDirectory, "ignore.txt"), "");
 var workspaceEntries = WorkspaceEntry.ReadDirectory(workspaceDirectory);
-Check(workspaceEntries.Count == 2 && workspaceEntries[0].IsDirectory);
-Check(workspaceEntries[1].Name == "sample.mp4");
+Check(workspaceEntries.Count == 3 && workspaceEntries[0].IsDirectory);
+Check(workspaceEntries.Any(entry => entry.Name == "sample.mp4"));
+Check(workspaceEntries.Single(entry => entry.Name == "ignore.txt").Icon == "\uE8A5");
+Check(new WorkspaceEntry("photo.PNG", false).Icon == "\uEB9F");
+Check(new WorkspaceEntry("movie.mp4", false).Icon == "\uE714");
 Check(WorkspaceEntry.ReadDirectory(workspaceDirectory, foldersOnly: true).Count == 1);
-Console.WriteLine("PASS: duplicate identity and transforms, fit/move/resize anchor, project persistence, status text, workspace filtering");
+Console.WriteLine("PASS: duplicate identity and transforms, fit/move/resize anchor, project persistence, status text, workspace entries and icons, folders-only filtering");
 
 var occupied = new List<EditClip> { new() { Start = 1, Duration = 3, Layer = 1 }, new() { Start = 0, Duration = 5, Layer = 2 } };
 Check(ClipPlacement.FirstAvailableLayer(occupied, 2, 2) == 3);
@@ -98,7 +101,7 @@ var snappedCorner = ClipGeometry.SnapToCanvas(cornerClip, 1920, 1080, new VideoS
 var cornerBounds = ClipGeometry.Fit(snappedCorner, 1920, 1080, new VideoSettings());
 Near(cornerBounds.X, 0); Near(cornerBounds.Y, 0);
 var panelLayout = new PanelLayout(320, 280, 240);
-var layoutPath = Path.GetFullPath("artifacts/workspace-checks/layout.json");
+var layoutPath = Path.Combine(workspaceDirectory, "layout.json");
 LayoutPreferences.Save(layoutPath, panelLayout);
 Check(LayoutPreferences.Load(layoutPath) == panelLayout);
 var clampedLayout = new PanelLayout(9999, 9999, 9999).Constrain(960, 800);

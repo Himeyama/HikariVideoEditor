@@ -1,4 +1,4 @@
-using System.Drawing;
+﻿using System.Drawing;
 using VideoEditor;
 
 void Check(bool value, string name) { if (!value) throw new Exception(name); }
@@ -21,6 +21,40 @@ try
     if (args.Contains("--filenames-only"))
     {
         Console.WriteLine("PASS: content filenames, invalid characters, reserved names, duplicates and long content.");
+        return;
+    }
+    foreach (var template in MediaGeneration.ImageTemplates)
+    {
+        var options = new MediaGeneration.ImageOptions("空はなぜ青い？", "太陽の光は、さまざまな色の光が集まったものです。\n\nその中でも青い光は、大気中で強く散乱するため、空全体が青く見えます。", "太陽の光が、大気で散乱するからだよ",
+            Background: template.Background, TextColor: template.TextColor, Accent: template.Accent, Template: template.Id, Subtitle: "空が青く見える理由");
+        string rendered = Path.Combine(directory, template.Id + ".png");
+        await MediaGeneration.Image(rendered, options);
+        var preview = await MediaGeneration.ImagePreview(options);
+        Check(File.ReadAllBytes(rendered).SequenceEqual(preview), "preview matches output: " + template.Id);
+        var blank = options with { Title = "", Subtitle = "", Text = "", Footer = "" };
+        var backgroundOnly = await MediaGeneration.ImagePreview(blank);
+        var whitespaceOnly = await MediaGeneration.ImagePreview(blank with { Title = " ", Subtitle = "\t", Text = "\n", Footer = " " });
+        Check(backgroundOnly.SequenceEqual(whitespaceOnly), "blank fields draw no text: " + template.Id);
+        foreach (var single in new[] { blank with { Title = "タイトル" }, blank with { Subtitle = "副タイトル" },
+            blank with { Text = "説明" }, blank with { Footer = "字幕" } })
+            Check(!backgroundOnly.SequenceEqual(await MediaGeneration.ImagePreview(single)), "each optional field draws independently: " + template.Id);
+        using var bitmap = new Bitmap(rendered);
+        Check(bitmap.Width == 1920 && bitmap.Height == 1080, "template dimensions");
+        if (args.Contains("--templates-only"))
+        {
+            string previews = Path.GetFullPath(Path.Combine("artifacts", "image-template-previews"));
+            Directory.CreateDirectory(previews);
+            File.Copy(rendered, Path.Combine(previews, template.Id + ".png"), true);
+            File.WriteAllBytes(Path.Combine(previews, template.Id + "-background.png"), backgroundOnly);
+        }
+    }
+    var gothicPreview = await MediaGeneration.ImagePreview(new("フォントの確認", FontFamily: "Yu Gothic"));
+    var serifPreview = await MediaGeneration.ImagePreview(new("フォントの確認", FontFamily: "Yu Mincho"));
+    Check(!gothicPreview.SequenceEqual(serifPreview), "selected font changes rendered text");
+    await Reject(() => MediaGeneration.Image(Path.Combine(directory, "unknown.png"), new("test", Template: "unknown")), "unknown template");
+    if (args.Contains("--templates-only"))
+    {
+        Console.WriteLine("PASS: all template PNGs, exact preview/output match, four optional fields, font selection, dimensions and unknown template rejection.");
         return;
     }
     var voices = await MediaGeneration.Voices();

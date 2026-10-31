@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 
 namespace VideoEditor;
 
@@ -58,9 +58,10 @@ public static class McpDocumentation
         speech_voicesでインストール済みのWindows音声（Id・Name・Language）を取得できます。
         speech_createは原稿textからWAVを作ります。voiceに音声IDまたは完全な名前を指定します。
         rateは-10〜10（既定0）、volumeは0〜100（既定100）です。原稿はプレーンテキストです。
-        image_createは見出しtitle・本文text・footerと背景・図形をPNGに描く機能です。生成AIは使いません。
+        image_createはtitle（タイトル）・subtitle（副タイトル）・description（説明）・caption（字幕）と背景をPNGに描きます。4項目はすべて任意です。空欄は描画せず、全空欄なら背景のみ保存します。text/footerはdescription/captionの旧名として使えます。
         色background/textColor/accentは#RRGGBB、幅320〜3840、高さ240〜2160です。既定はプロジェクトの解像度です。
-        fontFamilyはインストール済みフォント名（既定Yu Gothic）、fontSizeは12〜240px（既定64）で、収まるよう縮小します。
+        templateはbasic（従来）、clean（すっきり解説）、science（サイエンス）、chalkboard（黒板スタイル）、gentle（やさしい雑学）です。図・キャラクターは描きません。
+        fontFamilyはインストール済みフォント名（既定は設定のフォント）、fontSizeは12〜240px（既定64）で、収まるよう縮小します。
         作成機能はこのPC内で動作し、外部サービスやAPIキーは不要です。
         pathを省略するとワークスペースのGeneratedフォルダー（未設定ならドキュメント内）へ一意の名前で保存します。
         pathを指定する場合は存在するフォルダー内の新しい絶対パスを使ってください。既存ファイルは上書きしません。
@@ -68,7 +69,7 @@ public static class McpDocumentation
         画像のdurationは秒（既定5）、音声の長さは作成したWAVから取得します。応答はpathとclip（追加しない場合null）です。
         追加後はpreview_refreshでプレビューを更新してください。
         例: speech_create {"text":"こんにちは。","rate":0,"addToTimeline":true,"start":0}
-        例: image_create {"title":"セキュリティの基本","text":"多要素認証を有効に","footer":"今日からできること","duration":6,"addToTimeline":true,"start":0}
+        例: image_create {"title":"セキュリティの基本","subtitle":"今日からできること","description":"多要素認証を有効に","caption":"安全な設定を確認しましょう","duration":6,"addToTimeline":true,"start":0}
 
         ## ツール一覧と入力スキーマ
         {{{{JsonSerializer.Serialize(McpTools.All, new JsonSerializerOptions { WriteIndented = true })}}}}

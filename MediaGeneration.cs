@@ -1,4 +1,4 @@
-using System.Drawing;
+﻿using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.Globalization;
@@ -115,8 +115,27 @@ public static class MediaGeneration
         });
     }
 
-    public sealed record ImageOptions(string Title, string Text = "", string Footer = "", int Width = 1920, int Height = 1080,
-        string Background = "#101B30", string TextColor = "#FFFFFF", string Accent = "#57E3C0", string FontFamily = "Yu Gothic", double FontSize = 64);
+    // Text/Footer remain aliases for existing callers; the four roles are title/subtitle/description/caption.
+    public sealed record ImageOptions(string Title = "", string Text = "", string Footer = "", int Width = 1920, int Height = 1080,
+        string Background = "#101B30", string TextColor = "#FFFFFF", string Accent = "#57E3C0", string FontFamily = "Yu Gothic", double FontSize = 64,
+        string Template = "basic", string Subtitle = "");
+
+    public sealed record ImageTemplate(string Id, string Name, string Background, string TextColor, string Accent);
+    public static IReadOnlyList<ImageTemplate> ImageTemplates { get; } = new ImageTemplate[]
+    {
+        new("basic", "シンプル（従来）", "#101B30", "#FFFFFF", "#57E3C0"),
+        new("clean", "すっきり解説", "#FAF5E9", "#102B4B", "#AD8736"),
+        new("science", "サイエンス", "#061426", "#F4FAFF", "#55DDF5"),
+        new("chalkboard", "黒板スタイル", "#144734", "#FFFBEA", "#F3D65C"),
+        new("gentle", "やさしい雑学", "#F6F0FC", "#50318A", "#A483E5")
+    };
+
+    public static async Task<byte[]> ImagePreview(ImageOptions options)
+    {
+        string path = Path.Combine(Path.GetTempPath(), "Hikari-preview-" + Guid.NewGuid().ToString("N") + ".png");
+        try { await Image(path, options); return await File.ReadAllBytesAsync(path); }
+        finally { if (File.Exists(path)) File.Delete(path); }
+    }
 
     private static Color ParseColor(string value)
     {
@@ -128,11 +147,12 @@ public static class MediaGeneration
     public static Task<string> Image(string path, ImageOptions options)
     {
         ValidateOutput(path, ".png");
-        if (string.IsNullOrWhiteSpace(options.Title) || options.Title.Length > 200 || options.Text.Length > 4000 || options.Footer.Length > 300)
-            throw new ArgumentException("見出しは1〜200文字、本文は4000文字以内、フッターは300文字以内です。");
+        if (options.Title.Length > 200 || options.Subtitle.Length > 300 || options.Text.Length > 4000 || options.Footer.Length > 300)
+            throw new ArgumentException("タイトルは200文字以内、副タイトルは300文字以内、説明は4000文字以内、字幕は300文字以内です。すべて省略できます。");
         if (options.Width is < 320 or > 3840 || options.Height is < 240 or > 2160 || (long)options.Width * options.Height > 8_294_400)
             throw new ArgumentException("画像の幅は320〜3840、高さは240〜2160で指定してください。");
         if (!double.IsFinite(options.FontSize) || options.FontSize is < 12 or > 240) throw new ArgumentException("文字サイズは12〜240です。");
+        if (!ImageTemplates.Any(t => t.Id == options.Template)) throw new ArgumentException("テンプレートがありません。");
         var background = ParseColor(options.Background); var foreground = ParseColor(options.TextColor); var accent = ParseColor(options.Accent);
         return Task.Run(() =>
         {
@@ -142,24 +162,67 @@ public static class MediaGeneration
             g.SmoothingMode = SmoothingMode.AntiAlias;
             g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
             g.Clear(background);
-            using var ink = new SolidBrush(foreground); using var highlight = new SolidBrush(accent);
-            float w = options.Width, h = options.Height, margin = w * .06f;
-            g.FillRectangle(highlight, margin, h * .1f, w * .06f, Math.Max(3, h * .008f));
-            DrawText(options.Title, new RectangleF(margin, h * .19f, w - margin * 2, h * .24f), (float)options.FontSize, FontStyle.Bold, ink);
-            DrawText(options.Text, new RectangleF(margin, h * .47f, w - margin * 2, h * .32f), (float)options.FontSize * .62f, FontStyle.Regular, ink);
-            DrawText(options.Footer, new RectangleF(margin, h * .87f, w - margin * 2, h * .08f), (float)options.FontSize * .36f, FontStyle.Regular, highlight);
+            if (options.Template != "basic")
+            {
+                using var resource = typeof(MediaGeneration).Assembly.GetManifestResourceStream($"VideoEditor.ImageTemplates.{options.Template}.png")
+                    ?? throw new InvalidOperationException("テンプレートの背景画像が見つかりません。");
+                using var plate = System.Drawing.Image.FromStream(resource);
+                g.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                g.DrawImage(plate, new Rectangle(0, 0, options.Width, options.Height));
+            }
+            // Layout and font sizes are authored independently for each theme at 1920 x 1080.
+            float scale = (float)(options.FontSize / 64 * options.Width / 1920.0);
+            switch (options.Template)
+            {
+                case "clean":
+                    Draw(options.Title, .10f, .020f, .80f, .085f, 84, true, foreground, true);
+                    Draw(options.Subtitle, .025f, .135f, .315f, .050f, 42, true, Color.White, true);
+                    Draw(options.Text, .08f, .27f, .84f, .49f, 48, false, foreground);
+                    Draw(options.Footer, .08f, .85f, .84f, .085f, 58, true, Color.White, true);
+                    break;
+                case "science":
+                    Draw(options.Title, .35f, .025f, .43f, .085f, 94, true, foreground, true);
+                    Draw(options.Subtitle, .035f, .027f, .26f, .075f, 46, true, accent);
+                    Draw(options.Text, .095f, .35f, .81f, .38f, 46, false, foreground);
+                    Draw(options.Footer, .085f, .855f, .83f, .08f, 56, true, foreground, true);
+                    break;
+                case "chalkboard":
+                    Draw(options.Title, .17f, .045f, .66f, .095f, 100, true, foreground, true);
+                    Draw(options.Subtitle, .12f, .24f, .76f, .08f, 52, true, accent, true);
+                    Draw(options.Text, .13f, .37f, .74f, .32f, 50, false, foreground);
+                    Draw(options.Footer, .12f, .855f, .76f, .08f, 64, true, Color.FromArgb(16, 62, 38), true);
+                    break;
+                case "gentle":
+                    Draw(options.Title, .24f, .015f, .52f, .075f, 82, true, foreground, true);
+                    Draw(options.Subtitle, .30f, .110f, .40f, .055f, 46, true, Color.White, true);
+                    Draw(options.Text, .12f, .26f, .76f, .44f, 46, false, Color.FromArgb(58, 43, 84));
+                    Draw(options.Footer, .11f, .825f, .78f, .075f, 58, true, foreground, true);
+                    break;
+                default:
+                    using (var highlight = new SolidBrush(accent))
+                        g.FillRectangle(highlight, options.Width * .06f, options.Height * .10f, options.Width * .06f, Math.Max(3, options.Height * .008f));
+                    Draw(options.Title, .06f, .19f, .88f, .20f, 64, true, foreground);
+                    Draw(options.Subtitle, .06f, .40f, .88f, .07f, 44, true, accent);
+                    Draw(options.Text, .06f, .50f, .88f, .29f, 40, false, foreground);
+                    Draw(options.Footer, .06f, .87f, .88f, .08f, 24, false, accent);
+                    break;
+            }
             string temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
             try { bitmap.Save(temporary, ImageFormat.Png); File.Move(temporary, path); }
             finally { if (File.Exists(temporary)) File.Delete(temporary); }
             return path;
 
-            void DrawText(string text, RectangleF bounds, float size, FontStyle style, Brush brush)
+            void Draw(string text, float x, float y, float width, float height, float size, bool bold, Color color, bool center = false)
             {
-                if (text.Length == 0) return;
-                using var format = new StringFormat { Trimming = StringTrimming.None };
-                for (float current = size; current >= 10; current -= 1)
+                if (string.IsNullOrWhiteSpace(text)) return;
+                var bounds = new RectangleF(x * options.Width, y * options.Height, width * options.Width, height * options.Height);
+                using var brush = new SolidBrush(color);
+                using var format = new StringFormat { Trimming = StringTrimming.None,
+                    Alignment = center ? StringAlignment.Center : StringAlignment.Near, LineAlignment = bold ? StringAlignment.Center : StringAlignment.Near };
+                float start = size * scale, minimum = Math.Min(start, 10);
+                for (float current = start; current >= minimum; current -= 1)
                 {
-                    using var font = new Font(family, current, style, GraphicsUnit.Pixel);
+                    using var font = new Font(family, current, bold ? FontStyle.Bold : FontStyle.Regular, GraphicsUnit.Pixel);
                     var measured = g.MeasureString(text, font, new SizeF(bounds.Width, 1_000_000), format, out int fitted, out _);
                     if (fitted < text.Length || measured.Height > bounds.Height || measured.Width > bounds.Width) continue;
                     g.DrawString(text, font, brush, bounds, format); return;

@@ -70,7 +70,9 @@ Check(new[] { "speech_voices", "speech_create", "image_create" }.All(names.Conta
 foreach (var call in new[] {
     """{"jsonrpc":"2.0","id":20,"method":"tools/call","params":{"name":"speech_voices","arguments":{}}}""",
     """{"jsonrpc":"2.0","id":21,"method":"tools/call","params":{"name":"speech_create","arguments":{"text":"test","rate":0,"addToTimeline":true}}}""",
-    """{"jsonrpc":"2.0","id":22,"method":"tools/call","params":{"name":"image_create","arguments":{"title":"test","width":1920,"duration":6}}}"""
+    """{"jsonrpc":"2.0","id":22,"method":"tools/call","params":{"name":"image_create","arguments":{"title":"test","width":1920,"duration":6}}}""",
+    """{"jsonrpc":"2.0","id":24,"method":"tools/call","params":{"name":"image_create","arguments":{}}}""",
+    """{"jsonrpc":"2.0","id":25,"method":"tools/call","params":{"name":"image_create","arguments":{"subtitle":"副タイトル","description":"説明","caption":"字幕","template":"clean"}}}"""
 }) {
     var generated = await Rpc(call);
     Check(!generated.GetProperty("result").GetProperty("isError").GetBoolean(), "generation tool dispatch");

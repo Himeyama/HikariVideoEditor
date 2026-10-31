@@ -1,4 +1,4 @@
-using Microsoft.UI.Xaml;
+﻿using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using System.Text.Json;
 
@@ -49,11 +49,11 @@ public sealed partial class MainWindow
                 p.TryGetProperty("rate", out var rate) ? rate.GetInt32() : 0,
                 p.TryGetProperty("volume", out var volume) ? volume.GetInt32() : 100);
         else
-            await MediaGeneration.Image(path, new MediaGeneration.ImageOptions(StringArg("title") ?? "", StringArg("text") ?? "", StringArg("footer") ?? "",
+            await MediaGeneration.Image(path, new MediaGeneration.ImageOptions(StringArg("title") ?? "", StringArg("description") ?? StringArg("text") ?? "", StringArg("caption") ?? StringArg("footer") ?? "",
                 p.TryGetProperty("width", out var width) ? width.GetInt32() : project.Video.Width,
                 p.TryGetProperty("height", out var height) ? height.GetInt32() : project.Video.Height,
                 StringArg("background") ?? "#101B30", StringArg("textColor") ?? "#FFFFFF", StringArg("accent") ?? "#57E3C0",
-                StringArg("fontFamily") ?? "Yu Gothic", NumberArg("fontSize", 64)));
+                StringArg("fontFamily") ?? preferences.Subtitle.FontFamily, NumberArg("fontSize", 64), StringArg("template") ?? "basic", StringArg("subtitle") ?? ""));
         if (speech)
         {
             preferences.LastSpeechVoice = StringArg("voice");
@@ -111,9 +111,20 @@ public sealed partial class MainWindow
     private async void CreateImage_Click(object sender, RoutedEventArgs e) => await Run(async () =>
     {
         RequireGenerationWorkspace();
-        var title = new TextBox { Header = "見出し", MaxLength = 200 };
-        var text = new TextBox { Header = "本文", AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, Height = 140, MaxLength = 4000 };
-        var footer = new TextBox { Header = "フッター", MaxLength = 300 };
+        var template = new ComboBox { Header = "テンプレート", ItemsSource = MediaGeneration.ImageTemplates, DisplayMemberPath = "Name", SelectedIndex = 0, HorizontalAlignment = HorizontalAlignment.Stretch };
+        using var installedFonts = new System.Drawing.Text.InstalledFontCollection();
+        var font = new ComboBox { Header = "フォント（初期値は設定のフォント）", IsEditable = true,
+            ItemsSource = installedFonts.Families.Select(f => f.Name).Distinct().OrderBy(name => name).ToArray(),
+            HorizontalAlignment = HorizontalAlignment.Stretch };
+        font.SelectedItem = preferences.Subtitle.FontFamily;
+        font.Text = preferences.Subtitle.FontFamily;
+        string SelectedFont() => string.IsNullOrWhiteSpace(font.Text) ? preferences.Subtitle.FontFamily : font.Text.Trim();
+        var preview = new Microsoft.UI.Xaml.Controls.Image { Height = 230, Stretch = Microsoft.UI.Xaml.Media.Stretch.Uniform };
+        var previewError = new TextBlock { TextWrapping = TextWrapping.Wrap };
+        var title = new TextBox { Header = "タイトル（任意）", MaxLength = 200 };
+        var subtitle = new TextBox { Header = "副タイトル（任意）", MaxLength = 300 };
+        var text = new TextBox { Header = "説明（任意）", AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, Height = 140, MaxLength = 4000 };
+        var footer = new TextBox { Header = "字幕（任意）", MaxLength = 300 };
         var background = new TextBox { Header = "背景色（#RRGGBB）", Text = "#101B30" };
         var textColor = new TextBox { Header = "文字色（#RRGGBB）", Text = "#FFFFFF" };
         var accent = new TextBox { Header = "アクセント色（#RRGGBB）", Text = "#57E3C0" };
@@ -122,13 +133,59 @@ public sealed partial class MainWindow
         title.TextChanged += (_, _) => path.Text = GeneratedPath(title.Text, ".png");
         var add = new CheckBox { Content = "再生位置に追加する", IsChecked = true };
         var panel = new StackPanel { Spacing = 12, Width = 480 };
-        panel.Children.Add(new TextBlock { Text = $"見出し・本文・図形の画像を作成します（{project.Video.Width} × {project.Video.Height}）。", TextWrapping = TextWrapping.Wrap });
-        foreach (var control in new UIElement[] { title, text, footer, background, textColor, accent, duration, path, add }) panel.Children.Add(control);
+        panel.Children.Add(new TextBlock { Text = $"タイトル・副タイトル・説明・字幕を配置します。すべて未入力でも背景のみ作成できます（{project.Video.Width} × {project.Video.Height}）。", TextWrapping = TextWrapping.Wrap });
+        foreach (var control in new UIElement[] { template, font, preview, previewError, title, subtitle, text, footer, background, textColor, accent, duration, path, add }) panel.Children.Add(control);
+        panel.Children.Insert(4, new TextBlock { Text = "プレビューの未入力欄には項目名を表示します。保存画像では未入力欄に文字を描きません。", TextWrapping = TextWrapping.Wrap });
+        int previewVersion = 0;
+        bool updatingTemplate = false;
+        async Task UpdatePreview()
+        {
+            if (updatingTemplate) return;
+            int version = ++previewVersion;
+            await Task.Delay(250);
+            if (version != previewVersion) return;
+            try
+            {
+                var bytes = await MediaGeneration.ImagePreview(new MediaGeneration.ImageOptions(
+                    string.IsNullOrWhiteSpace(title.Text) ? "タイトル" : title.Text,
+                    string.IsNullOrWhiteSpace(text.Text) ? "説明" : text.Text, string.IsNullOrWhiteSpace(footer.Text) ? "字幕" : footer.Text, project.Video.Width, project.Video.Height,
+                    background.Text, textColor.Text, accent.Text, FontFamily: SelectedFont(), Template: ((MediaGeneration.ImageTemplate)template.SelectedItem).Id,
+                    Subtitle: string.IsNullOrWhiteSpace(subtitle.Text) ? "副タイトル" : subtitle.Text));
+                using var stream = new MemoryStream(bytes);
+                var source = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage();
+                await source.SetSourceAsync(stream.AsRandomAccessStream());
+                if (version != previewVersion) return;
+                preview.Source = source;
+                previewError.Text = "";
+            }
+            catch (Exception ex)
+            {
+                if (version != previewVersion) return;
+                preview.Source = null;
+                previewError.Text = ex.Message;
+            }
+        }
+        template.SelectionChanged += async (_, _) =>
+        {
+            updatingTemplate = true;
+            var selected = (MediaGeneration.ImageTemplate)template.SelectedItem;
+            background.Text = selected.Background;
+            textColor.Text = selected.TextColor;
+            accent.Text = selected.Accent;
+            background.IsEnabled = accent.IsEnabled = selected.Id == "basic";
+            updatingTemplate = false;
+            await UpdatePreview();
+        };
+        foreach (var field in new[] { title, subtitle, text, footer, background, textColor, accent })
+            field.TextChanged += async (_, _) => await UpdatePreview();
+        font.SelectionChanged += async (_, _) => await UpdatePreview();
+        font.RegisterPropertyChangedCallback(ComboBox.TextProperty, async (_, _) => await UpdatePreview());
+        await UpdatePreview();
         await GenerationDialog("画像を作成", panel, async () =>
         {
         path.Text = GeneratedPath(title.Text, ".png");
-        await GenerateMedia(JsonSerializer.SerializeToElement(new { path = path.Text, title = title.Text, text = text.Text, footer = footer.Text,
-            background = background.Text, textColor = textColor.Text, accent = accent.Text, duration = duration.Value, addToTimeline = add.IsChecked == true }), false);
+        await GenerateMedia(JsonSerializer.SerializeToElement(new { path = path.Text, title = title.Text, subtitle = subtitle.Text, description = text.Text, caption = footer.Text,
+            fontFamily = SelectedFont(), template = ((MediaGeneration.ImageTemplate)template.SelectedItem).Id, background = background.Text, textColor = textColor.Text, accent = accent.Text, duration = duration.Value, addToTimeline = add.IsChecked == true }), false);
         if (add.IsChecked == true) await Refresh();
         Status.Text = $"画像を保存しました: {path.Text}";
         }).ShowAsync();

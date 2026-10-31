@@ -18,5 +18,5 @@
     <Compile Remove="tests/**/*.cs" />
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.6.250602001" />
   </ItemGroup>
-<ItemGroup><FrameworkReference Include="Microsoft.WindowsDesktop.App.WindowsForms" /></ItemGroup></Project>
+<ItemGroup><FrameworkReference Include="Microsoft.WindowsDesktop.App.WindowsForms" /></ItemGroup><ItemGroup><EmbeddedResource Include="Assets/ImageTemplates/*.png" LogicalName="VideoEditor.ImageTemplates.%(Filename).png" /></ItemGroup></Project>
 

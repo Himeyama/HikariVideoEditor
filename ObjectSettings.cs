@@ -127,6 +127,7 @@ public sealed partial class MainWindow
                 throw;
             }
             Remember(previous);
+            await AutoSaveChanges(System.Text.Json.JsonSerializer.Serialize(previous));
             Draw();
             DisplayObjectValues(edit);
             SelectedName.Text = edit.ToString();

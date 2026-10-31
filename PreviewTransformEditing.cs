@@ -226,12 +226,14 @@ public sealed partial class MainWindow
             bool changed = state.Candidate.OffsetX != state.Original.OffsetX || state.Candidate.OffsetY != state.Original.OffsetY || state.Candidate.Scale != state.Original.Scale || state.Candidate.ScaleX != state.Original.ScaleX || state.Candidate.ScaleY != state.Original.ScaleY;
             if (changed)
             {
+                var previous = ProjectSnapshot();
                 var next = project.Copy();
                 next.Clips[next.Clips.FindIndex(clip => clip.Id == state.Original.Id)] = state.Candidate;
                 await CompositionBuilder.Build(next);
                 Remember();
                 project = next;
                 await Refresh();
+                await AutoSaveChanges(previous);
             }
 
             Select(project.Clips.Single(clip => clip.Id == state.Original.Id));

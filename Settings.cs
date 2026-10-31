@@ -22,6 +22,7 @@ public sealed partial class MainWindow
         Pause();
         var scale = SubtitleSettingsEditor.Choice(new[] { "37.5%", "50%", "75%", "80%", "90%", "95%", "100%", "125%", "150%", "175%", "200%" },
             Array.IndexOf(new[] { .375, .5, .75, .8, .9, .95, 1, 1.25, 1.5, 1.75, 2 }, preferences.Scale));
+        var autoSave = new ToggleSwitch { IsOn = preferences.AutoSaveEnabled, OnContent = "有効", OffContent = "無効" };
         var editor = new SubtitleSettingsEditor(preferences.Subtitle);
         var error = new TextBlock { TextWrapping = TextWrapping.Wrap };
         var content = new StackPanel { Spacing = 24, Width = Math.Max(0, Root.Width - 64), HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(32) };
@@ -32,7 +33,9 @@ public sealed partial class MainWindow
         heading.Children.Add(back);
         heading.Children.Add(new TextBlock { Text = "設定", FontSize = 28, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center });
         content.Children.Add(heading);
+        content.Children.Add(new TextBlock { Text = "一般", FontSize = 20, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
         content.Children.Add(SubtitleSettingsEditor.Group("表示", ("アプリの倍率", scale)));
+        content.Children.Add(SubtitleSettingsEditor.Group("保存", ("自動保存", autoSave)));
         content.Children.Add(new TextBlock { Text = "字幕の既定値", FontSize = 20, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
         content.Children.Add(editor);
         content.Children.Add(error);
@@ -40,7 +43,8 @@ public sealed partial class MainWindow
         {
             try
             {
-                var next = new AppPreferences { Scale = new[] { .375, .5, .75, .8, .9, .95, 1, 1.25, 1.5, 1.75, 2 }[scale.SelectedIndex], Subtitle = subtitle, RecentWorkspaces = preferences.RecentWorkspaces };
+                var next = new AppPreferences { AutoSaveEnabled = autoSave.IsOn, Scale = new[] { .375, .5, .75, .8, .9, .95, 1, 1.25, 1.5, 1.75, 2 }[scale.SelectedIndex], Subtitle = subtitle, RecentWorkspaces = preferences.RecentWorkspaces };
+                next.VoicevoxFavorites = preferences.VoicevoxFavorites;
                 next.Save(AppPreferences.DefaultPath);
                 preferences = next;
                 ApplyAppScale();
@@ -49,6 +53,7 @@ public sealed partial class MainWindow
             catch (Exception exception) { error.Text = exception.Message; }
         }
         scale.SelectionChanged += (_, _) => SavePreferences(preferences.Subtitle);
+        autoSave.Toggled += (_, _) => SavePreferences(preferences.Subtitle);
         editor.StyleChanged += SavePreferences;
         editor.ValidationFailed += message => error.Text = message;
         SettingsPage.Content = content;

@@ -10,8 +10,10 @@ Visual Studio 2022 の Windows App SDK / WinUI と .NET デスクトップ開発
 
 ```powershell
 .\build.ps1
-.\bin\x64\Debug\net8.0-windows10.0.19041.0\win-x64\VideoEditor.exe
 ```
+
+ビルドに成功すると、作成したアプリを自動で起動します。起動しない検証用ビルドは `.\build.ps1 -SkipLaunch` を使用できます。
+起動中のアプリを残して更新版を確認する場合は、`.\build.ps1 -OutputDirectory .\bin\SettingsLayout` のように別の出力先を指定できます。
 
 Windows App SDK はアプリの出力に同梱します。.NET 8 Desktop Runtime が別途必要です。通常の `dotnet build` は環境によって Visual Studio の PRI ビルドタスクを見つけられないため、上記スクリプトを使用してください。
 
@@ -153,3 +155,11 @@ PowerShellクライアントは従来のメソッド名をMCPツール名に変�
 
 
 字幕の輪郭はWinding規則で塗りつぶし、線が重なる部分の欠けを防止します。プレビューと動画出力は上側のレイヤーを前面として同じ順序で合成します。ワークスペースの長いファイル名は末尾を省略し、ツールチップで全文を表示します。
+
+## 音声と画像を作成
+
+「ファイル → 音声を作成…」で原稿、Windowsの音声、速度、音量、WAV保存先を指定できます。「ファイル → 画像を作成…」では見出し・本文・フッターと色を指定し、プロジェクトの解像度でPNGカードを描きます。作成時の「再生位置に追加する」でタイムラインに配置できます。画像は文字と図形の描画で、生成AIは使用しません。両機能ともこのPC内で動作し、APIキーは不要です。
+
+MCPには speech_voices、speech_create、image_create を公開しています。詳しい引数は起動中のアプリの /docs と tools/list で取得できます。path省略時はワークスペース（未設定ならドキュメント）のGeneratedフォルダーに保存します。既存ファイルの上書きは拒否します。addToTimelineは既定false、startは既定で再生位置、画像のdurationは既定5秒です。追加後はpreview_refreshを呼んでください。音声のvoiceはspeech_voicesが返すIdまたはNameを指定します。
+
+検証: dotnet run --project tests/MediaGenerationChecks/MediaGenerationChecks.csproj（Windowsの実音声とPNG出力、既存ファイル保護、入力制限を確認）。

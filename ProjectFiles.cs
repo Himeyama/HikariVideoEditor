@@ -8,6 +8,25 @@ using Windows.Storage.Pickers;
 namespace VideoEditor;
 public sealed partial class MainWindow
 {
+    private string ProjectSnapshot() => JsonSerializer.Serialize(project);
+
+    private async Task AutoSaveChanges(string previous)
+    {
+        if (!preferences.AutoSaveEnabled || string.IsNullOrWhiteSpace(project.WorkspaceDirectory) || previous == ProjectSnapshot())
+            return;
+        try
+        {
+            var directory = Path.TrimEndingDirectorySeparator(Path.GetFullPath(project.WorkspaceDirectory));
+            var name = Path.GetFileName(directory);
+            if (string.IsNullOrEmpty(name)) name = "Project";
+            await Save(Path.Combine(directory, name + ".hve"));
+        }
+        catch (Exception exception)
+        {
+            Status.Text = $"自動保存に失敗しました: {exception.Message}";
+        }
+    }
+
     private async Task Save(string path)
     {
         var full = Path.GetFullPath(path);

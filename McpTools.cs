@@ -56,6 +56,9 @@ public static class McpTools
 
     public static readonly Tool[] All =
     [
+        new("speech.voices", "List installed local Windows SAPI voices (Id, Name, Language)."),
+        new("speech.create", "Create a local WAV from plain text using Windows SAPI. Optional voice is an ID or exact name from speech_voices; rate -10..10, volume 0..100. path defaults to a unique file in workspace/Generated; never overwrites. addToTimeline defaults false; start defaults playhead. Returns path and optional clip with duration. Refresh preview after adding.", "text:string path:string voice:string rate:integer volume:integer addToTimeline:boolean start:number", "text"),
+        new("image.create", "Render a title/body/footer card with accent rectangle to local PNG (not AI image generation). Colors #RRGGBB. Defaults project dimensions, Yu Gothic, fontSize 64px (shrinks to fit), dark background, white text, mint accent. New path or unique workspace/Generated path. addToTimeline defaults false; start defaults playhead; duration defaults 5 seconds. Returns path and optional clip. Refresh preview after adding.", "title:string text:string footer:string path:string width:integer height:integer background:string textColor:string accent:string fontFamily:string fontSize:number addToTimeline:boolean start:number duration:number", "title"),
         new("project.get", "Get project settings and all clips with IDs."),
         new("clip.add", "Add a local media file. By default append; atPlayhead places at current time.", "path:string atPlayhead:boolean", "path"),
         new("clip.update", "Update clip timing (seconds), layer (1 is front), volume, position (pixels), or scale. Refresh preview after editing.", "id:string start:number trim:number duration:number layer:integer volume:number offsetX:number offsetY:number scale:number", "id"),

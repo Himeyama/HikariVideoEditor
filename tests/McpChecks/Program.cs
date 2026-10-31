@@ -50,7 +50,7 @@ Check(init.GetProperty("result").GetProperty("protocolVersion").GetString() == "
 using (var notification = await Send("""{"jsonrpc":"2.0","method":"notifications/initialized"}"""))
     Check(notification.StatusCode == HttpStatusCode.Accepted && (await notification.Content.ReadAsByteArrayAsync()).Length == 0, "notification");
 var list = await Rpc("""{"jsonrpc":"2.0","id":2,"method":"tools/list"}""");
-Check(list.GetProperty("result").GetProperty("tools").GetArrayLength() == 18, "tools list");
+Check(list.GetProperty("result").GetProperty("tools").GetArrayLength() == 21, "tools list");
 var result = await Rpc("""{"jsonrpc":"2.0","id":"call","method":"tools/call","params":{"name":"project_get","arguments":{}}}""");
 Check(!result.GetProperty("result").GetProperty("isError").GetBoolean() && calls == 1, "tool dispatch");
 result = await Rpc("""{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"clip_delete","arguments":{"id":"missing"}}}""");
@@ -65,5 +65,17 @@ using (var forbidden = await Send("{}", "https://evil.example")) Check(forbidden
 using (var unsupported = await Send("{}", version: "bad")) Check(unsupported.StatusCode == HttpStatusCode.BadRequest, "version");
 using (var get = await client.GetAsync(bridge.Endpoint)) Check(get.StatusCode == HttpStatusCode.MethodNotAllowed, "GET without SSE");
 using (var oversize = await Send(new string(' ', 262145))) Check(oversize.StatusCode == HttpStatusCode.RequestEntityTooLarge, "body limit");
+var names = list.GetProperty("result").GetProperty("tools").EnumerateArray().Select(t => t.GetProperty("name").GetString()).ToArray();
+Check(new[] { "speech_voices", "speech_create", "image_create" }.All(names.Contains), "generation tools exposed");
+foreach (var call in new[] {
+    """{"jsonrpc":"2.0","id":20,"method":"tools/call","params":{"name":"speech_voices","arguments":{}}}""",
+    """{"jsonrpc":"2.0","id":21,"method":"tools/call","params":{"name":"speech_create","arguments":{"text":"test","rate":0,"addToTimeline":true}}}""",
+    """{"jsonrpc":"2.0","id":22,"method":"tools/call","params":{"name":"image_create","arguments":{"title":"test","width":1920,"duration":6}}}"""
+}) {
+    var generated = await Rpc(call);
+    Check(!generated.GetProperty("result").GetProperty("isError").GetBoolean(), "generation tool dispatch");
+}
+var invalid = await Rpc("""{"jsonrpc":"2.0","id":23,"method":"tools/call","params":{"name":"speech_create","arguments":{"rate":0}}}""");
+Check(invalid.GetProperty("error").GetProperty("code").GetInt32() == -32602, "speech text required");
 blocker.Stop();
-Console.WriteLine("PASS: port fallback, multiple instances, initialization, notification, 18 tools, dispatch, errors, schema, Origin, protocol version, GET, body limit");
+Console.WriteLine("PASS: port fallback, multiple instances, initialization, notification, 21 tools, dispatch, errors, schema, Origin, protocol version, GET, body limit");

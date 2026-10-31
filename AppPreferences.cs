@@ -2,6 +2,12 @@ using System.Text.Json;
 
 namespace VideoEditor;
 
+public sealed record VoicevoxFavorite(string SpeakerUuid, int StyleId, string Character, string Style)
+{
+    public string Name => $"VOICEVOX: {Character}（{Style}）";
+    public string VoiceId => $"voicevox:{SpeakerUuid}:{StyleId}";
+}
+
 public sealed record SubtitleStyle
 {
     public string FontFamily { get; set; } = "Noto Sans JP";
@@ -24,9 +30,14 @@ public sealed record SubtitleStyle
 public sealed class AppPreferences
 {
     public int PreferencesVersion { get; set; } = 2;
+    public bool AutoSaveEnabled { get; set; }
     public double Scale { get; set; } = 1;
     public SubtitleStyle Subtitle { get; set; } = new();
     public List<string> RecentWorkspaces { get; set; } = new();
+    public List<VoicevoxFavorite> VoicevoxFavorites { get; set; } = new();
+    public string? LastSpeechVoice { get; set; }
+    public int LastSpeechRate { get; set; }
+    public int LastSpeechVolume { get; set; } = 100;
 
     public void RememberWorkspace(string directory)
     {
@@ -44,6 +55,8 @@ public sealed class AppPreferences
         if (!double.IsFinite(Scale) || Scale is < .375 or > 2)
             throw new ArgumentException("アプリの倍率は37.5〜200%で指定してください。");
         Subtitle.Validate();
+        if (LastSpeechRate is < -10 or > 10 || LastSpeechVolume is < 0 or > 100)
+            throw new ArgumentException("音声の速度は-10〜10、音量は0〜100です。");
     }
 
     public static AppPreferences Load(string path)

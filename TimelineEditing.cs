@@ -13,7 +13,8 @@ using Windows.UI;
 namespace VideoEditor;
 public sealed partial class MainWindow
 {
-    private const double PixelsPerSecond = 48; // DIPs, never physical pixels.
+    private double PixelsPerSecond = 48; // DIPs, never physical pixels.
+    private readonly Canvas timelineRuler = new() { IsHitTestVisible = false };
     private const double TrackLeft = 96;
     private const double RulerHeight = 32;
     private const double TrackHeight = 40;
@@ -46,6 +47,9 @@ public sealed partial class MainWindow
 
     private void InitializePlayback()
     {
+        Timeline.AddHandler(UIElement.PointerWheelChangedEvent, new PointerEventHandler(Timeline_PointerWheelChanged), true);
+        TimelineScroll.AddHandler(UIElement.PointerWheelChangedEvent, new PointerEventHandler(Timeline_PointerWheelChanged), true);
+        TimelineScroll.ViewChanged += (_, _) => DrawTimelineRuler();
         var player = new MediaPlayer
         {
             AutoPlay = false
@@ -172,20 +176,27 @@ public sealed partial class MainWindow
                 await Run(() => e.Key == Windows.System.VirtualKey.Z ? RestoreHistory(undo, redo) : RestoreHistory(redo, undo));
             return;
         }
-        if (e.Key is not (Windows.System.VirtualKey.Space or Windows.System.VirtualKey.Left or Windows.System.VirtualKey.Right))
+        if (!IsTransportKey(e.Key))
             return;
-        // Preserve spaces in file names and other text entry fields.
-        var focused = FocusManager.GetFocusedElement(Root.XamlRoot) as DependencyObject;
-        for (var current = focused; current != null; current = VisualTreeHelper.GetParent(current))
-            if (current is TextBox or RichEditBox or PasswordBox or NumberBox or MenuBarItem or MenuFlyoutItem or ComboBox)
-                return;
+        // Consume transport keys before focused controls can edit or activate.
         e.Handled = true;
-        if (e.Key == Windows.System.VirtualKey.Left)
+        if (e.Key is Windows.System.VirtualKey.Left or Windows.System.VirtualKey.Up)
             StepFrame(-1);
-        else if (e.Key == Windows.System.VirtualKey.Right)
+        else if (e.Key is Windows.System.VirtualKey.Right or Windows.System.VirtualKey.Down)
             StepFrame(1);
         else if (!e.KeyStatus.WasKeyDown)
             TogglePlayback();
+    }
+
+    private static bool IsTransportKey(Windows.System.VirtualKey key) =>
+        key is Windows.System.VirtualKey.Space or Windows.System.VirtualKey.Left or
+            Windows.System.VirtualKey.Right or Windows.System.VirtualKey.Up or Windows.System.VirtualKey.Down;
+
+    private void Root_PreviewKeyUp(object sender, KeyRoutedEventArgs e)
+    {
+        // Buttons can activate on Space release, so consume both halves of the key press.
+        if (IsTransportKey(e.Key))
+            e.Handled = true;
     }
 
     private void Stop_Click(object sender, RoutedEventArgs e)
@@ -203,6 +214,59 @@ public sealed partial class MainWindow
 
     private void PreviousFrame_Click(object sender, RoutedEventArgs e) => StepFrame(-1);
     private void NextFrame_Click(object sender, RoutedEventArgs e) => StepFrame(1);
+    private void Timeline_PointerWheelChanged(object sender, PointerRoutedEventArgs e)
+    {
+        if (e.Handled || !ControlPressed)
+            return;
+        var point = e.GetCurrentPoint(TimelineScroll);
+        if (point.Properties.IsHorizontalMouseWheel)
+            return;
+        e.Handled = true;
+        if (drag != null || marquee != null || scrubPointer != null || gate.CurrentCount == 0)
+            return;
+
+        double next = Math.Clamp(PixelsPerSecond * Math.Pow(1.2, point.Properties.MouseWheelDelta / 120.0), 3, 1536);
+        if (next == PixelsPerSecond)
+            return;
+        // Keep the time beneath the pointer in the same place while zooming.
+        double time = Math.Max(0, (TimelineScroll.HorizontalOffset + point.Position.X - TrackLeft) / PixelsPerSecond);
+        PixelsPerSecond = next;
+        DrawTimeline();
+        TimelineScroll.UpdateLayout();
+        TimelineScroll.ChangeView(Math.Max(0, TrackLeft + time * PixelsPerSecond - point.Position.X), null, null, true);
+        DrawTimelineRuler();
+    }
+
+    private void DrawTimelineRuler()
+    {
+        timelineRuler.Children.Clear();
+        double desired = 120 / PixelsPerSecond;
+        double magnitude = Math.Pow(10, Math.Floor(Math.Log10(desired)));
+        double major = new[] { 1.0, 2, 5, 10 }.First(value => value * magnitude >= desired) * magnitude;
+        double step = major / 5;
+        double left = Math.Max(0, (TimelineScroll.HorizontalOffset - TrackLeft) / PixelsPerSecond);
+        double right = Math.Max(left, (TimelineScroll.HorizontalOffset + TimelineScroll.ViewportWidth - TrackLeft) / PixelsPerSecond);
+        long first = Math.Max(0, (long)Math.Floor(left / step) - 5);
+        long last = (long)Math.Ceiling(right / step);
+        for (long index = first; index <= last; index++)
+        {
+            bool labeled = index % 5 == 0;
+            double x = TrackLeft + index * step * PixelsPerSecond;
+            var tick = new Rectangle
+            {
+                Width = 1, Height = labeled ? 16 : 8,
+                Fill = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"]
+            };
+            Canvas.SetLeft(tick, x);
+            Canvas.SetTop(tick, labeled ? 16 : 24);
+            timelineRuler.Children.Add(tick);
+            if (!labeled) continue;
+            var label = new TextBlock { Text = TimeLabel(index * step), FontSize = 12 };
+            Canvas.SetLeft(label, x + 8);
+            timelineRuler.Children.Add(label);
+        }
+    }
+
     private void TimelineScroll_SizeChanged(object sender, SizeChangedEventArgs e)
     {
         DispatcherQueue.TryEnqueue(() =>
@@ -246,29 +310,8 @@ public sealed partial class MainWindow
             Timeline.Children.Add(line);
         }
 
-        for (int i = 0; i < (Timeline.Width - TrackLeft) / PixelsPerSecond; i++)
-        {
-            var tick = new Rectangle
-            {
-                Width = 1,
-                Height = i % 5 == 0 ? 16 : 8,
-                Fill = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"],
-                IsHitTestVisible = false
-            };
-            Canvas.SetLeft(tick, TrackLeft + i * PixelsPerSecond);
-            Canvas.SetTop(tick, i % 5 == 0 ? 16 : 24);
-            Timeline.Children.Add(tick);
-            if (i % 5 != 0)
-                continue;
-            var label = new TextBlock
-            {
-                Text = TimeLabel(i),
-                FontSize = 12,
-                IsHitTestVisible = false
-            };
-            Canvas.SetLeft(label, TrackLeft + i * PixelsPerSecond + 8);
-            Timeline.Children.Add(label);
-        }
+        Timeline.Children.Add(timelineRuler);
+        DrawTimelineRuler();
 
         foreach (var clip in project.Clips)
         {
@@ -335,7 +378,7 @@ public sealed partial class MainWindow
         UpdatePosition(playhead);
     }
 
-    private static void Place(Grid view, EditClip c)
+    private void Place(Grid view, EditClip c)
     {
         view.Width = Math.Max(16, c.Duration * PixelsPerSecond);
         Canvas.SetLeft(view, TrackLeft + c.Start * PixelsPerSecond);
@@ -535,7 +578,9 @@ public sealed partial class MainWindow
         {
             if (state.Changed)
             {
+                var previous = ProjectSnapshot();
                 await CommitTimelineCandidates(state.GroupCandidates);
+                await AutoSaveChanges(previous);
             }
         }
         catch (Exception ex)

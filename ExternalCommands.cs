@@ -13,7 +13,10 @@ public sealed partial class MainWindow
             {
                 if (closed)
                     throw new InvalidOperationException("終了中です。");
-                completion.SetResult(await Command(request));
+                var previous = ProjectSnapshot();
+                var result = await Command(request);
+                await AutoSaveChanges(previous);
+                completion.SetResult(result);
             }
             catch (Exception ex)
             {
@@ -43,6 +46,12 @@ public sealed partial class MainWindow
                 };
             case "project.get":
                 return project.Copy();
+            case "speech.voices":
+                return await MediaGeneration.Voices();
+            case "speech.create":
+                return await GenerateMedia(p, true);
+            case "image.create":
+                return await GenerateMedia(p, false);
             case "clip.add":
                 var added = await Add(Arg("path"), p.TryGetProperty("atPlayhead", out var atPlayhead) && atPlayhead.GetBoolean() ? playhead : null);
                 return added;
@@ -101,6 +110,7 @@ public sealed partial class MainWindow
                 await LoadWorkspaceDirectory(workspacePath);
                 Remember();
                 project.WorkspaceDirectory = workspacePath;
+                UpdateGenerationAvailability();
                 UpdateStatusBar();
                 return new
                 {

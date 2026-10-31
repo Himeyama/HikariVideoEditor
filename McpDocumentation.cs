@@ -54,6 +54,22 @@ public static class McpDocumentation
         ツール結果はresult.contentのtype=textのtext内にJSONとして格納します。
         ツール実行失敗はresult.isError=true、プロトコルエラーはerror.codeとerror.messageで返します。
 
+        ## 音声・画像の作成
+        speech_voicesでインストール済みのWindows音声（Id・Name・Language）を取得できます。
+        speech_createは原稿textからWAVを作ります。voiceに音声IDまたは完全な名前を指定します。
+        rateは-10〜10（既定0）、volumeは0〜100（既定100）です。原稿はプレーンテキストです。
+        image_createは見出しtitle・本文text・footerと背景・図形をPNGに描く機能です。生成AIは使いません。
+        色background/textColor/accentは#RRGGBB、幅320〜3840、高さ240〜2160です。既定はプロジェクトの解像度です。
+        fontFamilyはインストール済みフォント名（既定Yu Gothic）、fontSizeは12〜240px（既定64）で、収まるよう縮小します。
+        作成機能はこのPC内で動作し、外部サービスやAPIキーは不要です。
+        pathを省略するとワークスペースのGeneratedフォルダー（未設定ならドキュメント内）へ一意の名前で保存します。
+        pathを指定する場合は存在するフォルダー内の新しい絶対パスを使ってください。既存ファイルは上書きしません。
+        addToTimeline:trueで素材も追加します（既定false）。start省略時は再生位置です。
+        画像のdurationは秒（既定5）、音声の長さは作成したWAVから取得します。応答はpathとclip（追加しない場合null）です。
+        追加後はpreview_refreshでプレビューを更新してください。
+        例: speech_create {"text":"こんにちは。","rate":0,"addToTimeline":true,"start":0}
+        例: image_create {"title":"セキュリティの基本","text":"多要素認証を有効に","footer":"今日からできること","duration":6,"addToTimeline":true,"start":0}
+
         ## ツール一覧と入力スキーマ
         {{{{JsonSerializer.Serialize(McpTools.All, new JsonSerializerOptions { WriteIndented = true })}}}}
         """;

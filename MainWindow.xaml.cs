@@ -52,6 +52,8 @@ public sealed partial class MainWindow : Window
         {
             SavePanelLayout();
             closed = true;
+            workspaceWatcher?.Dispose();
+            workspaceRefreshTimer?.Stop();
             exportCancellation?.Cancel();
             downloadCancellation?.Cancel();
             playbackTimer.Stop();
@@ -64,6 +66,7 @@ public sealed partial class MainWindow : Window
         };
         Draw();
         McpPortStatus.Text = $":{bridge.Port}";
+        InitializeVoicevox();
     }
 
     private async Task Run(Func<Task> action)
@@ -71,7 +74,9 @@ public sealed partial class MainWindow : Window
         await gate.WaitAsync();
         try
         {
+            var previous = ProjectSnapshot();
             await action();
+            await AutoSaveChanges(previous);
         }
         catch (Exception ex)
         {
@@ -103,6 +108,7 @@ public sealed partial class MainWindow : Window
 
     private void Draw()
     {
+        UpdateGenerationAvailability();
         UpdateHistoryButtons();
         ClipEditing.FrameRate = project.Video.FrameRate;
         if (selected == null) DisplaySubtitleSettings(null);

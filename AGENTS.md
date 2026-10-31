@@ -1,5 +1,14 @@
 # プロジェクトの作業メモ
 
+## C# コーディング規約
+
+- 今後の実装・修正・リファクタリングは [C# Coding Guidelines](docs/csharp-coding/SKILL.md) を読み、それに基づいて編集する。
+- 元スキル: https://github.com/Himeyama/DESIGN/blob/main/skills/csharp-coding/SKILL.md 。ユーザー指定により、2026-10-31 時点の内容を上記のパスに保存した。
+- `var` を使わず明示的に型を宣言し、型を重複させない `new()`、コレクション式、ファイルスコープ名前空間を使う。
+- nullable を有効にし、null の可能性を型に反映する。private フィールドは `_camelCase`、定数は `PascalCase` とする。XAML が生成するフィールドは編集しない。
+- LINQ はメソッド構文を優先し、非同期処理は `Task` / `Task<T>` と `await` を使う。UI イベントハンドラーの `async void` はイベントのシグネチャに従う。
+- 値等価性が必要なデータには `record` を使い、通常の入力エラーに例外を使わず `TryParse` 等を使う。変更可能な編集モデルを無理に不変化しない。
+
 ## バージョン管理
 
 - 初期バージョンは `v0.1.0`。プロジェクトの `Version` は `0.1.0`、リリースタグは先頭に `v` を付ける。

@@ -17,23 +17,23 @@ public sealed partial class MainWindow
         public EditClip Candidate { get; set; } = ClipEditing.Clone(Original);
     }
 
-    private List<PreviewVisual> previewVisuals = [];
-    private PreviewDrag? previewDrag;
-    private double PreviewScale => Math.Min(PreviewViewport.ActualWidth / project.Video.Width, PreviewViewport.ActualHeight / project.Video.Height);
+    private List<PreviewVisual> _previewVisuals = [];
+    private PreviewDrag? _previewDrag;
+    private double PreviewScale => Math.Min(PreviewViewport.ActualWidth / _project.Video.Width, PreviewViewport.ActualHeight / _project.Video.Height);
 
     private Point ProjectPoint(Point point)
     {
         double scale = PreviewScale;
-        double left = (PreviewViewport.ActualWidth - project.Video.Width * scale) / 2;
-        double top = (PreviewViewport.ActualHeight - project.Video.Height * scale) / 2;
+        double left = (PreviewViewport.ActualWidth - _project.Video.Width * scale) / 2;
+        double top = (PreviewViewport.ActualHeight - _project.Video.Height * scale) / 2;
         return new Point((point.X - left) / scale, (point.Y - top) / scale);
     }
 
     private ClipBounds ViewportBounds(ClipBounds bounds)
     {
         double scale = PreviewScale;
-        double left = (PreviewViewport.ActualWidth - project.Video.Width * scale) / 2;
-        double top = (PreviewViewport.ActualHeight - project.Video.Height * scale) / 2;
+        double left = (PreviewViewport.ActualWidth - _project.Video.Width * scale) / 2;
+        double top = (PreviewViewport.ActualHeight - _project.Video.Height * scale) / 2;
         return new ClipBounds(left + bounds.X * scale, top + bounds.Y * scale, bounds.Width * scale, bounds.Height * scale);
     }
 
@@ -53,12 +53,12 @@ public sealed partial class MainWindow
         PreviewInteraction.Children.Clear();
         if (PausedPreview.Visibility != Visibility.Visible || PreviewScale <= 0)
             return;
-        var visual = previewVisuals.FirstOrDefault(item => item.Clip.Id == selected);
+        PreviewVisual? visual = _previewVisuals.FirstOrDefault(item => item.Clip.Id == _selected);
         if (visual == null)
             return;
-        var bounds = ViewportBounds(changingBounds ?? visual.Bounds);
-        var stroke = ObjectAppearance.Brush(visual.Clip);
-        var outline = new Microsoft.UI.Xaml.Shapes.Rectangle
+        ClipBounds bounds = ViewportBounds(changingBounds ?? visual.Bounds);
+        SolidColorBrush stroke = ObjectAppearance.Brush(visual.Clip);
+        Microsoft.UI.Xaml.Shapes.Rectangle outline = new()
         {
             Width = bounds.Width,
             Height = bounds.Height,
@@ -70,7 +70,7 @@ public sealed partial class MainWindow
         Canvas.SetLeft(outline, bounds.X);
         Canvas.SetTop(outline, bounds.Y);
         PreviewInteraction.Children.Add(outline);
-        foreach (var point in new[]
+        foreach (Point point in new[]
         {
             new Point(bounds.X, bounds.Y), new Point(bounds.Right, bounds.Y),
             new Point(bounds.X, bounds.Bottom), new Point(bounds.Right, bounds.Bottom),
@@ -78,7 +78,7 @@ public sealed partial class MainWindow
             new Point(bounds.X, (bounds.Y + bounds.Bottom) / 2), new Point(bounds.Right, (bounds.Y + bounds.Bottom) / 2)
         })
         {
-            var handle = new Border { Width = 8, Height = 8, Background = stroke, IsHitTestVisible = false };
+            Border handle = new() { Width = 8, Height = 8, Background = stroke, IsHitTestVisible = false };
             Canvas.SetLeft(handle, point.X - 4);
             Canvas.SetTop(handle, point.Y - 4);
             PreviewInteraction.Children.Add(handle);
@@ -96,7 +96,7 @@ public sealed partial class MainWindow
 
     private void SetPreviewCursor(int horizontal, int vertical)
     {
-        var shape = horizontal != 0 && vertical != 0
+        InputSystemCursorShape shape = horizontal != 0 && vertical != 0
             ? horizontal == vertical ? InputSystemCursorShape.SizeNorthwestSoutheast : InputSystemCursorShape.SizeNortheastSouthwest
             : horizontal != 0 ? InputSystemCursorShape.SizeWestEast
             : vertical != 0 ? InputSystemCursorShape.SizeNorthSouth : InputSystemCursorShape.Arrow;
@@ -105,32 +105,32 @@ public sealed partial class MainWindow
 
     private void Preview_PointerExited(object sender, PointerRoutedEventArgs e)
     {
-        if (previewDrag == null) SetPreviewCursor(0, 0);
+        if (_previewDrag == null) SetPreviewCursor(0, 0);
     }
     private void Preview_PointerPressed(object sender, PointerRoutedEventArgs e)
     {
-        var pointer = e.GetCurrentPoint(PreviewInteraction);
-        if (!pointer.Properties.IsLeftButtonPressed || previewDrag != null || drag != null || scrubPointer != null || PreviewScale <= 0)
+        PointerPoint pointer = e.GetCurrentPoint(PreviewInteraction);
+        if (!pointer.Properties.IsLeftButtonPressed || _previewDrag != null || _drag != null || _scrubPointer != null || PreviewScale <= 0)
             return;
         Pause();
-        var projectPoint = ProjectPoint(pointer.Position);
-        var selectedVisual = previewVisuals.FirstOrDefault(item => item.Clip.Id == selected);
-        var edges = selectedVisual == null ? (Horizontal: 0, Vertical: 0)
+        Point projectPoint = ProjectPoint(pointer.Position);
+        PreviewVisual? selectedVisual = _previewVisuals.FirstOrDefault(item => item.Clip.Id == _selected);
+        (int Horizontal, int Vertical) edges = selectedVisual == null ? (Horizontal: 0, Vertical: 0)
             : PreviewEdges(pointer.Position, ViewportBounds(selectedVisual.Bounds));
         bool resize = edges.Horizontal != 0 || edges.Vertical != 0;
-        var visual = resize ? selectedVisual : previewVisuals.LastOrDefault(item => item.Bounds.Contains(projectPoint.X, projectPoint.Y));
-        if (visual == null || !gate.Wait(0))
+        PreviewVisual? visual = resize ? selectedVisual : _previewVisuals.LastOrDefault(item => item.Bounds.Contains(projectPoint.X, projectPoint.Y));
+        if (visual == null || !_gate.Wait(0))
             return;
-        var clip = project.Clips.FirstOrDefault(item => item.Id == visual.Clip.Id && playhead >= item.Start && playhead < item.Start + item.Duration);
-        if (clip == null || project.Layer(clip.Layer).Locked || !PreviewInteraction.CapturePointer(e.Pointer))
+        EditClip? clip = _project.Clips.FirstOrDefault(item => item.Id == visual.Clip.Id && _playhead >= item.Start && _playhead < item.Start + item.Duration);
+        if (clip == null || _project.Layer(clip.Layer).Locked || !PreviewInteraction.CapturePointer(e.Pointer))
         {
-            gate.Release();
+            _gate.Release();
             return;
         }
 
-        var original = ClipEditing.Clone(clip);
+        EditClip original = ClipEditing.Clone(clip);
         original.SubtitleBounds = visual.Clip.SubtitleBounds;
-        previewDrag = new PreviewDrag(e.Pointer.PointerId, original, visual.Bounds, projectPoint, visual, edges.Horizontal, edges.Vertical);
+        _previewDrag = new PreviewDrag(e.Pointer.PointerId, original, visual.Bounds, projectPoint, visual, edges.Horizontal, edges.Vertical);
         SetPreviewCursor(edges.Horizontal, edges.Vertical);
         Select(clip);
         e.Handled = true;
@@ -138,16 +138,16 @@ public sealed partial class MainWindow
 
     private void Preview_PointerMoved(object sender, PointerRoutedEventArgs e)
     {
-        var state = previewDrag;
+        PreviewDrag? state = _previewDrag;
         if (state == null)
         {
-            var visual = previewVisuals.FirstOrDefault(item => item.Clip.Id == selected);
-            var edges = visual == null ? (Horizontal: 0, Vertical: 0) : PreviewEdges(e.GetCurrentPoint(PreviewInteraction).Position, ViewportBounds(visual.Bounds));
+            PreviewVisual? visual = _previewVisuals.FirstOrDefault(item => item.Clip.Id == _selected);
+            (int Horizontal, int Vertical) edges = visual == null ? (Horizontal: 0, Vertical: 0) : PreviewEdges(e.GetCurrentPoint(PreviewInteraction).Position, ViewportBounds(visual.Bounds));
             SetPreviewCursor(edges.Horizontal, edges.Vertical);
             return;
         }
         if (state.PointerId != e.Pointer.PointerId) return;
-        var point = ProjectPoint(e.GetCurrentPoint(PreviewInteraction).Position);
+        Point point = ProjectPoint(e.GetCurrentPoint(PreviewInteraction).Position);
         double cornerX = state.LeftCorner ? state.OriginalBounds.X : state.OriginalBounds.Right;
         double cornerY = state.TopCorner ? state.OriginalBounds.Y : state.OriginalBounds.Bottom;
         if (state.Horizontal != 0 && state.Vertical != 0)
@@ -169,55 +169,55 @@ public sealed partial class MainWindow
         }
         if (!state.Resize)
         {
-            state.Candidate = ClipGeometry.SnapToCanvas(state.Candidate, state.Visual.SourceWidth, state.Visual.SourceHeight, project.Video, 8 / PreviewScale);
+            state.Candidate = ClipGeometry.SnapToCanvas(state.Candidate, state.Visual.SourceWidth, state.Visual.SourceHeight, _project.Video, 8 / PreviewScale);
         }
 
-        var bounds = ClipGeometry.Fit(state.Candidate, state.Visual.SourceWidth, state.Visual.SourceHeight, project.Video);
+        ClipBounds bounds = ClipGeometry.Fit(state.Candidate, state.Visual.SourceWidth, state.Visual.SourceHeight, _project.Video);
         PlacePreviewImage(state.Visual.Image, bounds);
         if (state.Resize && state.Candidate.Kind == "subtitle") RefreshDraggingSubtitle(state);
         UpdateTransformOverlay(bounds);
         e.Handled = true;
     }
 
-    private bool renderingSubtitleDrag;
+    private bool _renderingSubtitleDrag;
     private async void RefreshDraggingSubtitle(PreviewDrag state)
     {
-        if (renderingSubtitleDrag) return;
-        renderingSubtitleDrag = true;
+        if (_renderingSubtitleDrag) return;
+        _renderingSubtitleDrag = true;
         try
         {
             (double Scale, double X, double Y)? rendered = null;
-            while (previewDrag == state && !closed)
+            while (_previewDrag == state && !_closed)
             {
                 await Task.Delay(40);
-                if (previewDrag != state || closed) break;
-                var clip = ClipEditing.Clone(state.Candidate);
-                var scale = (clip.Scale, clip.ScaleX, clip.ScaleY);
+                if (_previewDrag != state || _closed) break;
+                EditClip clip = ClipEditing.Clone(state.Candidate);
+                (double Scale, double ScaleX, double ScaleY) scale = (clip.Scale, clip.ScaleX, clip.ScaleY);
                 if (rendered == scale) break;
-                var video = project.Copy().Video;
-                var path = await Task.Run(() => SubtitleRenderer.SourcePath(clip, video));
-                if (previewDrag != state || closed) break;
+                VideoSettings video = _project.Copy().Video;
+                string path = await Task.Run(() => SubtitleRenderer.SourcePath(clip, video));
+                if (_previewDrag != state || _closed) break;
                 if ((state.Candidate.Scale, state.Candidate.ScaleX, state.Candidate.ScaleY) != scale) continue;
-                using var stream = await (await Windows.Storage.StorageFile.GetFileFromPathAsync(path)).OpenReadAsync();
-                var bitmap = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage();
+                using Windows.Storage.Streams.IRandomAccessStreamWithContentType stream = await (await Windows.Storage.StorageFile.GetFileFromPathAsync(path)).OpenReadAsync();
+                Microsoft.UI.Xaml.Media.Imaging.BitmapImage bitmap = new();
                 await bitmap.SetSourceAsync(stream);
-                if (previewDrag != state || closed) break;
+                if (_previewDrag != state || _closed) break;
                 state.Visual.Image.Source = bitmap;
                 rendered = scale;
             }
         }
         catch (Exception exception)
         {
-            if (!closed && previewDrag == state) Status.Text = exception.Message;
+            if (!_closed && _previewDrag == state) Status.Text = exception.Message;
         }
-        finally { renderingSubtitleDrag = false; }
+        finally { _renderingSubtitleDrag = false; }
     }
     private async void Preview_PointerReleased(object sender, PointerRoutedEventArgs e)
     {
-        var state = previewDrag;
+        PreviewDrag? state = _previewDrag;
         if (state == null || state.PointerId != e.Pointer.PointerId)
             return;
-        previewDrag = null;
+        _previewDrag = null;
         SetPreviewCursor(0, 0);
         PreviewInteraction.ReleasePointerCaptures();
         e.Handled = true;
@@ -226,17 +226,17 @@ public sealed partial class MainWindow
             bool changed = state.Candidate.OffsetX != state.Original.OffsetX || state.Candidate.OffsetY != state.Original.OffsetY || state.Candidate.Scale != state.Original.Scale || state.Candidate.ScaleX != state.Original.ScaleX || state.Candidate.ScaleY != state.Original.ScaleY;
             if (changed)
             {
-                var previous = ProjectSnapshot();
-                var next = project.Copy();
+                string previous = ProjectSnapshot();
+                EditProject next = _project.Copy();
                 next.Clips[next.Clips.FindIndex(clip => clip.Id == state.Original.Id)] = state.Candidate;
                 await CompositionBuilder.Build(next);
                 Remember();
-                project = next;
+                _project = next;
                 await Refresh();
                 await AutoSaveChanges(previous);
             }
 
-            Select(project.Clips.Single(clip => clip.Id == state.Original.Id));
+            Select(_project.Clips.Single(clip => clip.Id == state.Original.Id));
         }
         catch (Exception exception)
         {
@@ -246,22 +246,22 @@ public sealed partial class MainWindow
         }
         finally
         {
-            gate.Release();
+            _gate.Release();
             RequestStill();
         }
     }
 
     private void Preview_PointerCanceled(object sender, PointerRoutedEventArgs e)
     {
-        var state = previewDrag;
+        PreviewDrag? state = _previewDrag;
         if (state == null || state.PointerId != e.Pointer.PointerId)
             return;
-        previewDrag = null;
+        _previewDrag = null;
         SetPreviewCursor(0, 0);
         PreviewInteraction.ReleasePointerCaptures();
         PlacePreviewImage(state.Visual.Image, state.OriginalBounds);
         UpdateTransformOverlay();
-        gate.Release();
+        _gate.Release();
         RequestStill();
     }
 }

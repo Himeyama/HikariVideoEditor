@@ -41,7 +41,7 @@ public sealed class AppPreferences
 
     public void RememberWorkspace(string directory)
     {
-        var fullPath = Path.TrimEndingDirectorySeparator(Path.GetFullPath(directory));
+        string fullPath = Path.TrimEndingDirectorySeparator(Path.GetFullPath(directory));
         RecentWorkspaces = (RecentWorkspaces ?? new())
             .Prepend(fullPath)
             .Where(path => !string.IsNullOrWhiteSpace(path))
@@ -63,9 +63,9 @@ public sealed class AppPreferences
     {
         try
         {
-            var json = File.ReadAllText(path);
-            var settings = JsonSerializer.Deserialize<AppPreferences>(json) ?? new();
-            using var document = JsonDocument.Parse(json);
+            string json = File.ReadAllText(path);
+            AppPreferences settings = JsonSerializer.Deserialize<AppPreferences>(json) ?? new();
+            using JsonDocument document = JsonDocument.Parse(json);
             if (document.RootElement.ValueKind == JsonValueKind.Object && !document.RootElement.TryGetProperty("PreferencesVersion", out _) && settings.Subtitle?.FontFamily == "Yu Gothic UI")
                 settings.Subtitle.FontFamily = "Noto Sans JP";
             settings.Validate();

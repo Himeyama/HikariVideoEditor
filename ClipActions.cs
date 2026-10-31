@@ -6,51 +6,51 @@ public sealed partial class MainWindow
 {
     private MenuFlyout CreateClipContextMenu(EditClip clip)
     {
-        var menu = new MenuFlyout();
-        var duplicate = new MenuFlyoutItem
+        MenuFlyout menu = new();
+        MenuFlyoutItem duplicate = new()
         {
             Text = "複製"
         };
         duplicate.Click += async (_, _) => await Run(() => DuplicateClip(clip.Id));
-        var split = new MenuFlyoutItem
+        MenuFlyoutItem split = new()
         {
             Text = "再生位置で分割"
         };
         split.Click += async (_, _) => await Run(async () =>
         {
-            await Split(clip.Id, playhead);
+            await Split(clip.Id, _playhead);
         });
-        var open = new MenuFlyoutItem
+        MenuFlyoutItem open = new()
         {
             Text = MediaFiles.OpenLabel(clip.Kind)
         };
         open.Click += async (_, _) => await Run(() => OpenMediaFile(clip.Path));
-        var delete = new MenuFlyoutItem
+        MenuFlyoutItem delete = new()
         {
             Text = "削除"
         };
         delete.Click += (_, _) =>
         {
-            Select(clip, preserveSelection: selectedIds.Contains(clip.Id));
+            Select(clip, preserveSelection: _selectedIds.Contains(clip.Id));
             Delete_Click(this, new RoutedEventArgs());
         };
-        menu.Items.Add(CreateAddSubtitleItem(playhead, clip.Layer));
+        menu.Items.Add(CreateAddSubtitleItem(_playhead, clip.Layer));
         menu.Items.Add(new MenuFlyoutSeparator());
         menu.Items.Add(duplicate);
         menu.Items.Add(split);
         if (clip.Kind == "subtitle")
         {
-            var edit = new MenuFlyoutItem { Text = "字幕を編集…" };
+            MenuFlyoutItem edit = new() { Text = "字幕を編集…" };
             edit.Click += async (_, _) => await Run(() => EditSubtitle(clip.Id));
             menu.Items.Add(edit);
         }
         else menu.Items.Add(open);
         menu.Items.Add(new MenuFlyoutSeparator());
         menu.Items.Add(delete);
-        var ripple = new MenuFlyoutItem { Text = "リップル削除（同じレイヤーを詰める）" };
+        MenuFlyoutItem ripple = new() { Text = "リップル削除（同じレイヤーを詰める）" };
         ripple.Click += async (_, _) => await Run(async () =>
         {
-            Select(clip, preserveSelection: selectedIds.Contains(clip.Id));
+            Select(clip, preserveSelection: _selectedIds.Contains(clip.Id));
             await DeleteSelection(true);
         });
         menu.Items.Add(ripple);
@@ -59,14 +59,14 @@ public sealed partial class MainWindow
 
     private async Task<EditClip> DuplicateClip(string id)
     {
-        var original = project.Clips.Single(clip => clip.Id == id);
-        project.RequireEditable(original.Layer);
-        var duplicate = ClipEditing.Duplicate(original);
-        var next = project.Copy();
+        EditClip original = _project.Clips.Single(clip => clip.Id == id);
+        _project.RequireEditable(original.Layer);
+        EditClip duplicate = ClipEditing.Duplicate(original);
+        EditProject next = _project.Copy();
         next.Clips.Add(duplicate);
         await CompositionBuilder.Build(next);
         Remember();
-        project = next;
+        _project = next;
         Select(duplicate);
         await Refresh();
         return duplicate;

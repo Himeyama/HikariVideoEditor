@@ -17,22 +17,22 @@ public sealed record AnonymousVideoSession(string VisitorData, string WebVersion
 
     public static AnonymousVideoSession Parse(string html, string agent)
     {
-        var timestamp = Regex.Match(html, "\"STS\"\\s*:\\s*([0-9]+)", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
-        var player = ReadObject(html, @"(?:var\s+)?ytInitialPlayerResponse\s*=\s*");
+        Match timestamp = Regex.Match(html, "\"STS\"\\s*:\\s*([0-9]+)", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
+        JsonElement? player = ReadObject(html, @"(?:var\s+)?ytInitialPlayerResponse\s*=\s*");
         return new AnonymousVideoSession(ReadString(html, "VISITOR_DATA"),
             ReadString(html, "INNERTUBE_CLIENT_VERSION") is { Length: > 0 } version ? version : Empty.WebVersion,
-            int.TryParse(timestamp.Groups[1].Value, out var sts) ? sts : 0, player);
+            int.TryParse(timestamp.Groups[1].Value, out int sts) ? sts : 0, player);
     }
 
     public static JsonElement? ReadObject(string input, string prefixPattern)
     {
-        var match = Regex.Match(input, prefixPattern, RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
+        Match match = Regex.Match(input, prefixPattern, RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
         if (!match.Success) return null;
-        var bytes = Encoding.UTF8.GetBytes(input[match.Index..][match.Length..]);
-        var reader = new Utf8JsonReader(bytes);
+        byte[] bytes = Encoding.UTF8.GetBytes(input[match.Index..][match.Length..]);
+        Utf8JsonReader reader = new(bytes);
         try
         {
-            using var document = JsonDocument.ParseValue(ref reader);
+            using JsonDocument document = JsonDocument.ParseValue(ref reader);
             return document.RootElement.Clone();
         }
         catch (JsonException) { return null; }
@@ -40,7 +40,7 @@ public sealed record AnonymousVideoSession(string VisitorData, string WebVersion
 
     private static string ReadString(string html, string name)
     {
-        var match = Regex.Match(html, "\"" + Regex.Escape(name) + "\"\\s*:\\s*(\"(?:[^\"\\\\]|\\\\.)*\")",
+        Match match = Regex.Match(html, "\"" + Regex.Escape(name) + "\"\\s*:\\s*(\"(?:[^\"\\\\]|\\\\.)*\")",
             RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
         return match.Success ? JsonSerializer.Deserialize<string>(match.Groups[1].Value) ?? "" : "";
     }
@@ -52,20 +52,20 @@ public sealed record AnonymousVideoSession(string VisitorData, string WebVersion
             ["clientName"] = name, ["clientVersion"] = version, ["userAgent"] = agent,
             ["hl"] = "en", ["gl"] = "US", ["visitorData"] = session.VisitorData
         };
-        var safari = Context("WEB", session.WebVersion, SafariAgent);
+        Dictionary<string, object> safari = Context("WEB", session.WebVersion, SafariAgent);
         safari["browserName"] = "Safari";
         safari["browserVersion"] = "18.0";
         safari["osName"] = "Macintosh";
         safari["osVersion"] = "15.0.0";
         yield return new("1", session.WebVersion, SafariAgent, safari);
-        var vr = Context("ANDROID_VR", "1.71.26", VrAgent);
+        Dictionary<string, object> vr = Context("ANDROID_VR", "1.71.26", VrAgent);
         vr["androidSdkVersion"] = 32;
         vr["osName"] = "Android";
         vr["osVersion"] = "12";
         vr["deviceMake"] = "Oculus";
         vr["deviceModel"] = "Quest 3";
         yield return new("28", "1.71.26", VrAgent, vr);
-        var embedded = Context("WEB_EMBEDDED_PLAYER", session.EmbeddedVersion, DesktopAgent);
+        Dictionary<string, object> embedded = Context("WEB_EMBEDDED_PLAYER", session.EmbeddedVersion, DesktopAgent);
         embedded["clientScreen"] = "EMBED";
         yield return new("56", session.EmbeddedVersion, DesktopAgent, embedded);
     }
@@ -78,16 +78,16 @@ public static class DownloadHttp
         for (int redirect = 0; redirect < 5; redirect++)
         {
             if (!VideoDownloadSource.IsMediaUrl(uri)) throw new InvalidOperationException("配信 URL が不正です。");
-            using var request = new HttpRequestMessage(HttpMethod.Get, uri);
+            using HttpRequestMessage request = new(HttpMethod.Get, uri);
             if (!string.IsNullOrWhiteSpace(agent)) request.Headers.UserAgent.ParseAdd(agent);
             request.Headers.Referrer = new Uri("https://www.youtube.com/");
             request.Headers.TryAddWithoutValidation("Origin", "https://www.youtube.com");
             if (probe) request.Headers.Range = new System.Net.Http.Headers.RangeHeaderValue(0, 0);
-            var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token);
+            HttpResponseMessage response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token);
             if ((int)response.StatusCode is not (301 or 302 or 303 or 307 or 308)) return response;
-            var location = response.Headers.Location;
+            Uri? location = response.Headers.Location;
             response.Dispose();
-            if (location == null || !Uri.TryCreate(uri, location, out var next)) break;
+            if (location == null || !Uri.TryCreate(uri, location, out Uri? next)) break;
             uri = next;
         }
         throw new InvalidOperationException("配信先の移動を確認できませんでした。");
@@ -95,15 +95,15 @@ public static class DownloadHttp
 
     public static async Task<string> ReadTextAsync(HttpClient http, HttpRequestMessage request, int limit, CancellationToken token)
     {
-        using var response = VideoDownloadSource.IsMediaUrl(request.RequestUri!)
+        using HttpResponseMessage response = VideoDownloadSource.IsMediaUrl(request.RequestUri!)
             ? await OpenMediaAsync(http, request.RequestUri!, request.Headers.UserAgent.ToString(), token)
             : await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token);
         if ((int)response.StatusCode is >= 300 and < 400)
             throw new InvalidOperationException("配信元が確認画面への移動を要求しています。匿名で取得できる別の方式を確認します。");
         response.EnsureSuccessStatusCode();
-        await using var body = await response.Content.ReadAsStreamAsync(token);
-        using var buffer = new MemoryStream();
-        var bytes = new byte[32768];
+        await using Stream body = await response.Content.ReadAsStreamAsync(token);
+        using MemoryStream buffer = new();
+        byte[] bytes = new byte[32768];
         int count;
         while ((count = await body.ReadAsync(bytes, token)) > 0)
         {

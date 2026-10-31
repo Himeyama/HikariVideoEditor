@@ -6,13 +6,13 @@ namespace VideoEditor;
 
 public sealed partial class MainWindow
 {
-    private CancellationTokenSource? exportCancellation;
+    private CancellationTokenSource? _exportCancellation;
 
     private async Task Export(string path)
     {
-        await VideoExport.Write(project, path, progress: new Progress<double>(value =>
+        await VideoExport.Write(_project, path, progress: new Progress<double>(value =>
         {
-            if (!closed)
+            if (!_closed)
                 Status.Text = $"動画を書き出し中: {value:F0}%";
         }));
         Status.Text = $"書き出し完了: {Path.GetFullPath(path)}";
@@ -20,22 +20,22 @@ public sealed partial class MainWindow
 
     private async void Export_Click(object sender, RoutedEventArgs e) => await Run(async () =>
     {
-        if (project.Clips.Count == 0)
+        if (_project.Clips.Count == 0)
             throw new ArgumentException("素材を追加してください。");
-        var snapshot = project.Copy();
+        EditProject snapshot = _project.Copy();
         snapshot.Validate();
-        var quality = new ComboBox { Header = "画質", SelectedIndex = 1, HorizontalAlignment = HorizontalAlignment.Stretch };
+        ComboBox quality = new() { Header = "画質", SelectedIndex = 1, HorizontalAlignment = HorizontalAlignment.Stretch };
         quality.Items.Add("標準（5 Mbps）");
         quality.Items.Add("高画質（10 Mbps）");
         quality.Items.Add("最高画質（20 Mbps）");
-        var content = new StackPanel { Spacing = 16, MinWidth = 320 };
+        StackPanel content = new() { Spacing = 16, MinWidth = 320 };
         content.Children.Add(new TextBlock
         {
             Text = $"MP4（H.264 / AAC）\n{snapshot.Video.Width} × {snapshot.Video.Height} / {snapshot.Video.FrameRate} fps\n音声: {snapshot.Video.AudioSampleRate / 1000.0:0.##} kHz\nタイムライン全体を書き出します。",
             TextWrapping = TextWrapping.Wrap
         });
         content.Children.Add(quality);
-        var settings = new ContentDialog
+        ContentDialog settings = new()
         {
             XamlRoot = Root.XamlRoot,
             Title = "動画を書き出す",
@@ -46,21 +46,21 @@ public sealed partial class MainWindow
         };
         if (await settings.ShowAsync() != ContentDialogResult.Primary)
             return;
-        var picker = new FileSavePicker { SuggestedFileName = "Movie", DefaultFileExtension = ".mp4" };
+        FileSavePicker picker = new() { SuggestedFileName = "Movie", DefaultFileExtension = ".mp4" };
         InitPicker(picker);
         picker.FileTypeChoices.Add("MP4 動画", new[] { ".mp4" });
-        var file = await picker.PickSaveFileAsync();
+        Windows.Storage.StorageFile file = await picker.PickSaveFileAsync();
         if (file == null)
             return;
 
-        using var cancellation = new CancellationTokenSource();
-        exportCancellation = cancellation;
-        var label = new TextBlock { Text = "動画を準備中…", TextWrapping = TextWrapping.Wrap };
-        var bar = new ProgressBar { Minimum = 0, Maximum = 100, IsIndeterminate = true };
-        var progressContent = new StackPanel { Spacing = 16, MinWidth = 320 };
+        using CancellationTokenSource cancellation = new();
+        _exportCancellation = cancellation;
+        TextBlock label = new() { Text = "動画を準備中…", TextWrapping = TextWrapping.Wrap };
+        ProgressBar bar = new() { Minimum = 0, Maximum = 100, IsIndeterminate = true };
+        StackPanel progressContent = new() { Spacing = 16, MinWidth = 320 };
         progressContent.Children.Add(label);
         progressContent.Children.Add(bar);
-        var dialog = new ContentDialog
+        ContentDialog dialog = new()
         {
             XamlRoot = Root.XamlRoot,
             Title = "動画を書き出し中",
@@ -77,10 +77,10 @@ public sealed partial class MainWindow
             label.Text = "キャンセル中…";
             dialog.IsEnabled = false;
         };
-        var showing = dialog.ShowAsync();
-        var progress = new Progress<double>(value =>
+        Windows.Foundation.IAsyncOperation<ContentDialogResult> showing = dialog.ShowAsync();
+        Progress<double> progress = new(value =>
         {
-            if (!acceptingProgress || cancellation.IsCancellationRequested || closed)
+            if (!acceptingProgress || cancellation.IsCancellationRequested || _closed)
                 return;
             bar.IsIndeterminate = false;
             bar.Value = Math.Clamp(value, 0, 100);
@@ -88,7 +88,7 @@ public sealed partial class MainWindow
         });
         try
         {
-            var bitrate = new uint[] { 5_000_000, 10_000_000, 20_000_000 }[quality.SelectedIndex];
+            uint bitrate = new uint[] { 5_000_000, 10_000_000, 20_000_000 }[quality.SelectedIndex];
             await VideoExport.Write(snapshot, file.Path, overwrite: true, videoBitrate: bitrate,
                 progress: progress, cancellationToken: cancellation.Token);
             Status.Text = $"書き出し完了: {file.Path}";
@@ -100,7 +100,7 @@ public sealed partial class MainWindow
         finally
         {
             acceptingProgress = false;
-            exportCancellation = null;
+            _exportCancellation = null;
             finished = true;
             dialog.Hide();
             await showing;

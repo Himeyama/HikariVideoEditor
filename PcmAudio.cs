@@ -13,7 +13,7 @@ public sealed class PcmAudio
 
     public static PcmAudio Read(string path)
     {
-        using var reader = new BinaryReader(File.OpenRead(path));
+        using BinaryReader reader = new(File.OpenRead(path));
         string Four() => new(reader.ReadChars(4));
         if (Four() != "RIFF") throw new InvalidDataException("WAV形式ではありません。");
         reader.ReadUInt32();
@@ -22,7 +22,7 @@ public sealed class PcmAudio
         long offset = 0, length = 0;
         while (reader.BaseStream.Position + 8 <= reader.BaseStream.Length)
         {
-            var tag = Four();
+            string tag = Four();
             long size = reader.ReadUInt32(), start = reader.BaseStream.Position;
             if (start + size > reader.BaseStream.Length) throw new InvalidDataException("WAVデータが欠けています。");
             if (tag == "fmt ")
@@ -37,7 +37,7 @@ public sealed class PcmAudio
         if (format != 1 || bits != 16 || channels is < 1 or > 2 || rate <= 0 || offset == 0)
             throw new InvalidDataException("16bit PCM音声を読み込めません。");
         long frames = length / (channels * 2);
-        var peaks = new float[(int)Math.Ceiling((double)frames / rate * 100)];
+        float[] peaks = new float[(int)Math.Ceiling((double)frames / rate * 100)];
         reader.BaseStream.Position = offset;
         for (long frame = 0; frame < frames; frame++)
         {
@@ -64,9 +64,9 @@ public sealed class PcmAudio
         if (first + frames > Frames + Rate / 50) throw new ArgumentException("音声の長さを超えています。");
         long bytes = frames * Channels * 2;
         if (bytes > uint.MaxValue - 36) throw new ArgumentException("音声が長すぎます。");
-        using var input = new BinaryReader(File.OpenRead(Path));
+        using BinaryReader input = new(File.OpenRead(Path));
         input.BaseStream.Position = Offset + first * Channels * 2;
-        using var output = new BinaryWriter(File.Create(destination));
+        using BinaryWriter output = new(File.Create(destination));
         output.Write("RIFF"u8); output.Write((uint)(bytes + 36)); output.Write("WAVEfmt "u8);
         output.Write(16); output.Write((short)1); output.Write((short)Channels); output.Write(Rate);
         output.Write(Rate * Channels * 2); output.Write((short)(Channels * 2)); output.Write((short)16);

@@ -5,19 +5,19 @@ static void Check(bool value)
     if (!value) throw new Exception("Workspace history assertion failed.");
 }
 
-var preferences = new AppPreferences();
+AppPreferences preferences = new();
 Check(!preferences.AutoSaveEnabled);
 preferences.AutoSaveEnabled = true;
-for (var index = 0; index < 25; index++)
+for (int index = 0; index < 25; index++)
     preferences.RememberWorkspace(Path.Combine(Path.GetTempPath(), $"workspace-{index}"));
 Check(preferences.RecentWorkspaces.Count == 20);
 Check(preferences.RecentWorkspaces[0].EndsWith("workspace-24"));
 Check(preferences.RecentWorkspaces[^1].EndsWith("workspace-5"));
-var recent = preferences.RecentWorkspaces[5];
+string recent = preferences.RecentWorkspaces[5];
 preferences.RememberWorkspace(recent.ToUpperInvariant() + Path.DirectorySeparatorChar);
 Check(preferences.RecentWorkspaces.Count == 20);
 Check(string.Equals(preferences.RecentWorkspaces[0], recent, StringComparison.OrdinalIgnoreCase));
-var path = Path.Combine(Path.GetTempPath(), $"workspace-history-{Guid.NewGuid():N}.json");
+string path = Path.Combine(Path.GetTempPath(), $"workspace-history-{Guid.NewGuid():N}.json");
 try
 {
     preferences.VoicevoxFavorites.Add(new VoicevoxFavorite("test-speaker", 3, "テスト", "ノーマル"));

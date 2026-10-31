@@ -10,16 +10,16 @@ public static class CompositionBuilder
     public static async Task<MediaComposition> Build(EditProject project)
     {
         project.Validate();
-        var composition = new MediaComposition();
-        var end = project.Clips.Count == 0 ? 1 : Math.Max(1, project.Clips.Max(c => c.Start + c.Duration));
+        MediaComposition composition = new();
+        double end = project.Clips.Count == 0 ? 1 : Math.Max(1, project.Clips.Max(c => c.Start + c.Duration));
         composition.Clips.Add(MediaClip.CreateFromColor(Color.FromArgb(255, 0, 0, 0), TimeSpan.FromSeconds(end)));
-        foreach (var layer in project.Clips.Where(c => c.Kind != "audio" && !project.Layer(c.Layer).Hidden).GroupBy(c => c.Layer).OrderByDescending(g => g.Key))
+        foreach (IGrouping<int, EditClip> layer in project.Clips.Where(c => c.Kind != "audio" && !project.Layer(c.Layer).Hidden).GroupBy(c => c.Layer).OrderByDescending(g => g.Key))
         {
-            var overlayLayer = new MediaOverlayLayer();
-            foreach (var item in layer.OrderBy(c => c.Start))
+            MediaOverlayLayer overlayLayer = new();
+            foreach (EditClip item in layer.OrderBy(c => c.Start))
             {
-                var file = await StorageFile.GetFileFromPathAsync(SubtitleRenderer.SourcePath(item, project.Video));
-                var clip = item.IsStill ? await MediaClip.CreateFromImageFileAsync(file, TimeSpan.FromSeconds(item.Duration)) : await MediaClip.CreateFromFileAsync(file);
+                StorageFile file = await StorageFile.GetFileFromPathAsync(SubtitleRenderer.SourcePath(item, project.Video));
+                MediaClip clip = item.IsStill ? await MediaClip.CreateFromImageFileAsync(file, TimeSpan.FromSeconds(item.Duration)) : await MediaClip.CreateFromFileAsync(file);
                 if (!item.IsStill)
                 {
                     if (item.Trim + item.Duration > clip.OriginalDuration.TotalSeconds + .02)
@@ -32,20 +32,20 @@ public static class CompositionBuilder
                 double width, height;
                 if (item.IsStill)
                 {
-                    var image = await file.Properties.GetImagePropertiesAsync();
+                    Windows.Storage.FileProperties.ImageProperties image = await file.Properties.GetImagePropertiesAsync();
                     width = image.Width;
                     height = image.Height;
                 }
                 else
                 {
-                    var video = clip.GetVideoEncodingProperties();
+                    VideoEncodingProperties video = clip.GetVideoEncodingProperties();
                     width = video.Width;
                     height = video.Height;
                 }
 
                 if (width <= 0 || height <= 0)
                     throw new ArgumentException($"素材の画面サイズが不正です: {item}");
-                var bounds = ClipGeometry.Fit(item, width, height, project.Video);
+                ClipBounds bounds = ClipGeometry.Fit(item, width, height, project.Video);
                 // A MediaOverlay defaults to a zero-sized rectangle, which renders black.
                 overlayLayer.Overlays.Add(new MediaOverlay(clip) {
                     Delay = TimeSpan.FromSeconds(item.Start),
@@ -58,10 +58,10 @@ public static class CompositionBuilder
             composition.OverlayLayers.Add(overlayLayer);
         }
 
-        foreach (var item in project.Clips.Where(c => (c.Kind == "audio" || c.Kind == "video" && (c.FadeIn > 0 || c.FadeOut > 0)) && !project.Layer(c.Layer).Muted && !project.Layer(c.Layer).Hidden))
+        foreach (EditClip item in project.Clips.Where(c => (c.Kind == "audio" || c.Kind == "video" && (c.FadeIn > 0 || c.FadeOut > 0)) && !project.Layer(c.Layer).Muted && !project.Layer(c.Layer).Hidden))
         {
             bool faded = item.FadeIn > 0 || item.FadeOut > 0;
-            var audio = await BackgroundAudioTrack.CreateFromFileAsync(await StorageFile.GetFileFromPathAsync(faded ? await AudioAnalysis.Faded(item) : item.Path));
+            BackgroundAudioTrack audio = await BackgroundAudioTrack.CreateFromFileAsync(await StorageFile.GetFileFromPathAsync(faded ? await AudioAnalysis.Faded(item) : item.Path));
             double trim = faded ? 0 : item.Trim;
             if (trim + item.Duration > audio.OriginalDuration.TotalSeconds + .02)
                 throw new ArgumentException($"音声の長さを超えています: {item}");
@@ -77,7 +77,7 @@ public static class CompositionBuilder
 
     public static MediaEncodingProfile CreateEncodingProfile(EditProject project)
     {
-        var profile = MediaEncodingProfile.CreateMp4(VideoEncodingQuality.HD1080p);
+        MediaEncodingProfile profile = MediaEncodingProfile.CreateMp4(VideoEncodingQuality.HD1080p);
         profile.Video.Width = (uint)project.Video.Width;
         profile.Video.Height = (uint)project.Video.Height;
         profile.Video.FrameRate.Numerator = (uint)project.Video.FrameRate;

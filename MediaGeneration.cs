@@ -1,4 +1,4 @@
-﻿using System.Drawing;
+using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.Globalization;
@@ -13,7 +13,7 @@ public static class MediaGeneration
 
     public static string ContentPath(string directory, string content, string extension)
     {
-        var invalid = Path.GetInvalidFileNameChars();
+        char[] invalid = Path.GetInvalidFileNameChars();
         string name = new(content.Trim().Select(c => invalid.Contains(c) ? '_' : c).ToArray());
         if (name.Length > 80) name = name[..(char.IsHighSurrogate(name[79]) ? 79 : 80)];
         name = name.TrimEnd(' ', '.');
@@ -30,8 +30,8 @@ public static class MediaGeneration
 
     private static Task<T> OnSpeechThread<T>(Func<T> work)
     {
-        var completion = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var thread = new Thread(() =>
+        TaskCompletionSource<T> completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        Thread thread = new(() =>
         {
             try { completion.SetResult(work()); }
             catch (Exception ex) { completion.SetException(ex); }
@@ -54,7 +54,7 @@ public static class MediaGeneration
         try
         {
             speaker = Com("SAPI.SpVoice"); tokens = speaker.GetVoices();
-            var voices = new List<Voice>();
+            List<Voice> voices = new();
             for (int i = 0; i < tokens.Count; i++)
             {
                 dynamic token = tokens.Item(i);
@@ -153,20 +153,20 @@ public static class MediaGeneration
             throw new ArgumentException("画像の幅は320〜3840、高さは240〜2160で指定してください。");
         if (!double.IsFinite(options.FontSize) || options.FontSize is < 12 or > 240) throw new ArgumentException("文字サイズは12〜240です。");
         if (!ImageTemplates.Any(t => t.Id == options.Template)) throw new ArgumentException("テンプレートがありません。");
-        var background = ParseColor(options.Background); var foreground = ParseColor(options.TextColor); var accent = ParseColor(options.Accent);
+        Color background = ParseColor(options.Background); Color foreground = ParseColor(options.TextColor); Color accent = ParseColor(options.Accent);
         return Task.Run(() =>
         {
-            using var family = new FontFamily(options.FontFamily);
-            using var bitmap = new Bitmap(options.Width, options.Height);
-            using var g = Graphics.FromImage(bitmap);
+            using FontFamily family = new(options.FontFamily);
+            using Bitmap bitmap = new(options.Width, options.Height);
+            using Graphics g = Graphics.FromImage(bitmap);
             g.SmoothingMode = SmoothingMode.AntiAlias;
             g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
             g.Clear(background);
             if (options.Template != "basic")
             {
-                using var resource = typeof(MediaGeneration).Assembly.GetManifestResourceStream($"VideoEditor.ImageTemplates.{options.Template}.png")
+                using Stream resource = typeof(MediaGeneration).Assembly.GetManifestResourceStream($"VideoEditor.ImageTemplates.{options.Template}.png")
                     ?? throw new InvalidOperationException("テンプレートの背景画像が見つかりません。");
-                using var plate = System.Drawing.Image.FromStream(resource);
+                using Image plate = System.Drawing.Image.FromStream(resource);
                 g.InterpolationMode = InterpolationMode.HighQualityBicubic;
                 g.DrawImage(plate, new Rectangle(0, 0, options.Width, options.Height));
             }
@@ -199,7 +199,7 @@ public static class MediaGeneration
                     Draw(options.Footer, .11f, .825f, .78f, .075f, 58, true, foreground, true);
                     break;
                 default:
-                    using (var highlight = new SolidBrush(accent))
+                    using (SolidBrush highlight = new(accent))
                         g.FillRectangle(highlight, options.Width * .06f, options.Height * .10f, options.Width * .06f, Math.Max(3, options.Height * .008f));
                     Draw(options.Title, .06f, .19f, .88f, .20f, 64, true, foreground);
                     Draw(options.Subtitle, .06f, .40f, .88f, .07f, 44, true, accent);
@@ -215,15 +215,15 @@ public static class MediaGeneration
             void Draw(string text, float x, float y, float width, float height, float size, bool bold, Color color, bool center = false)
             {
                 if (string.IsNullOrWhiteSpace(text)) return;
-                var bounds = new RectangleF(x * options.Width, y * options.Height, width * options.Width, height * options.Height);
-                using var brush = new SolidBrush(color);
-                using var format = new StringFormat { Trimming = StringTrimming.None,
+                RectangleF bounds = new(x * options.Width, y * options.Height, width * options.Width, height * options.Height);
+                using SolidBrush brush = new(color);
+                using StringFormat format = new() { Trimming = StringTrimming.None,
                     Alignment = center ? StringAlignment.Center : StringAlignment.Near, LineAlignment = bold ? StringAlignment.Center : StringAlignment.Near };
                 float start = size * scale, minimum = Math.Min(start, 10);
                 for (float current = start; current >= minimum; current -= 1)
                 {
-                    using var font = new Font(family, current, bold ? FontStyle.Bold : FontStyle.Regular, GraphicsUnit.Pixel);
-                    var measured = g.MeasureString(text, font, new SizeF(bounds.Width, 1_000_000), format, out int fitted, out _);
+                    using Font font = new(family, current, bold ? FontStyle.Bold : FontStyle.Regular, GraphicsUnit.Pixel);
+                    SizeF measured = g.MeasureString(text, font, new SizeF(bounds.Width, 1_000_000), format, out int fitted, out _);
                     if (fitted < text.Length || measured.Height > bounds.Height || measured.Width > bounds.Width) continue;
                     g.DrawString(text, font, brush, bounds, format); return;
                 }

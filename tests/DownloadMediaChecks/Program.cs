@@ -6,42 +6,42 @@ using Windows.Media.Transcoding;
 using Windows.Storage;
 using Windows.UI;
 
-var directory = Path.GetFullPath("artifacts/download-media-" + Guid.NewGuid().ToString("N"));
+string directory = Path.GetFullPath("artifacts/download-media-" + Guid.NewGuid().ToString("N"));
 Directory.CreateDirectory(directory);
-var folder = await StorageFolder.GetFolderFromPathAsync(directory);
-var fixture = new MediaComposition();
+StorageFolder folder = await StorageFolder.GetFolderFromPathAsync(directory);
+MediaComposition fixture = new();
 fixture.Clips.Add(MediaClip.CreateFromColor(Color.FromArgb(255, 255, 0, 0), TimeSpan.FromSeconds(1)));
-var input = await folder.CreateFileAsync("input.mp4");
+StorageFile input = await folder.CreateFileAsync("input.mp4");
 if (await fixture.RenderToFileAsync(input, MediaTrimmingPreference.Precise, MediaEncodingProfile.CreateMp4(VideoEncodingQuality.Wvga)) != TranscodeFailureReason.None)
     throw new Exception("Fixture generation failed");
-var wavPath = Path.Combine(directory, "input.wav");
-using (var writer = new BinaryWriter(File.Create(wavPath)))
+string wavPath = Path.Combine(directory, "input.wav");
+using (BinaryWriter writer = new(File.Create(wavPath)))
 {
     const int samples = 44100;
     writer.Write("RIFF"u8.ToArray()); writer.Write(36 + samples * 2); writer.Write("WAVEfmt "u8.ToArray());
     writer.Write(16); writer.Write((short)1); writer.Write((short)1); writer.Write(samples);
     writer.Write(samples * 2); writer.Write((short)2); writer.Write((short)16);
     writer.Write("data"u8.ToArray()); writer.Write(samples * 2);
-    for (var i = 0; i < samples; i++) writer.Write((short)(Math.Sin(i * 440 * Math.Tau / samples) * 4000));
+    for (int i = 0; i < samples; i++) writer.Write((short)(Math.Sin(i * 440 * Math.Tau / samples) * 4000));
 }
-var aac = await folder.CreateFileAsync("input.m4a");
-var transcode = await new MediaTranscoder().PrepareFileTranscodeAsync(await StorageFile.GetFileFromPathAsync(wavPath), aac, MediaEncodingProfile.CreateM4a(AudioEncodingQuality.High));
+StorageFile aac = await folder.CreateFileAsync("input.m4a");
+PrepareTranscodeResult transcode = await new MediaTranscoder().PrepareFileTranscodeAsync(await StorageFile.GetFileFromPathAsync(wavPath), aac, MediaEncodingProfile.CreateM4a(AudioEncodingQuality.High));
 if (!transcode.CanTranscode) throw new Exception("Audio fixture conversion failed");
 await transcode.TranscodeAsync();
-using var handler = new MediaHandler(File.ReadAllBytes(input.Path), File.ReadAllBytes(aac.Path));
-using var http = new HttpClient(handler);
-var transfer = new VideoDownloadTransfer(http);
-var video = new DownloadStream(new Uri("https://r1.googlevideo.com/video"), "video/mp4", handler.Video.Length, 480, 30, 5_000_000, false);
-var audio = new DownloadStream(new Uri("https://r1.googlevideo.com/audio"), "audio/mp4", handler.Audio.Length, 0, 0, 128000, true);
-var info = new DownloadVideo("test", "Test", TimeSpan.FromSeconds(1), [video], audio);
-var destination = Path.Combine(directory, "saved.mp4");
+using MediaHandler handler = new(File.ReadAllBytes(input.Path), File.ReadAllBytes(aac.Path));
+using HttpClient http = new(handler);
+VideoDownloadTransfer transfer = new(http);
+DownloadStream video = new(new Uri("https://r1.googlevideo.com/video"), "video/mp4", handler.Video.Length, 480, 30, 5_000_000, false);
+DownloadStream audio = new(new Uri("https://r1.googlevideo.com/audio"), "audio/mp4", handler.Audio.Length, 0, 0, 128000, true);
+DownloadVideo info = new("test", "Test", TimeSpan.FromSeconds(1), [video], audio);
+string destination = Path.Combine(directory, "saved.mp4");
 await VideoDownloadWriter.WriteAsync(transfer, info, video, destination, null, default);
-var saved = await StorageFile.GetFileFromPathAsync(destination);
-var properties = await saved.Properties.GetVideoPropertiesAsync();
+StorageFile saved = await StorageFile.GetFileFromPathAsync(destination);
+Windows.Storage.FileProperties.VideoProperties properties = await saved.Properties.GetVideoPropertiesAsync();
 if (properties.Width != 800 || properties.Duration.TotalSeconds < .9) throw new Exception("Invalid saved video");
-var audioProperties = await saved.Properties.GetMusicPropertiesAsync();
+Windows.Storage.FileProperties.MusicProperties audioProperties = await saved.Properties.GetMusicPropertiesAsync();
 if (audioProperties.Duration.TotalSeconds < .9) throw new Exception("Missing output audio");
-var original = File.ReadAllBytes(destination);
+byte[] original = File.ReadAllBytes(destination);
 try
 {
     await VideoDownloadWriter.WriteAsync(transfer, info, video, destination, null, default, overwrite: false);
@@ -49,16 +49,16 @@ try
 }
 catch (IOException) { }
 if (!File.ReadAllBytes(destination).SequenceEqual(original)) throw new Exception("Workspace output replaced existing file");
-var hlsVideo = video with { IsHls = true, Url = new Uri("https://r1.googlevideo.com/video.m3u8"), Audio = audio };
+DownloadStream hlsVideo = video with { IsHls = true, Url = new Uri("https://r1.googlevideo.com/video.m3u8"), Audio = audio };
 await VideoDownloadWriter.WriteAsync(transfer, info, hlsVideo, Path.Combine(directory, "hls.mp4"), null, default);
-var hlsOutput = await StorageFile.GetFileFromPathAsync(Path.Combine(directory, "hls.mp4"));
+StorageFile hlsOutput = await StorageFile.GetFileFromPathAsync(Path.Combine(directory, "hls.mp4"));
 if ((await hlsOutput.Properties.GetVideoPropertiesAsync()).Duration.TotalSeconds < .9) throw new Exception("HLS media was not rendered");
 if (args.Length == 2 && args[0] == "--ts-fixture")
 {
     handler.Transport = File.ReadAllBytes(args[1]);
-    var tsVideo = video with { IsHls = true, HasAudio = true, Url = new Uri("https://r1.googlevideo.com/transport.m3u8") };
+    DownloadStream tsVideo = video with { IsHls = true, HasAudio = true, Url = new Uri("https://r1.googlevideo.com/transport.m3u8") };
     await VideoDownloadWriter.WriteAsync(transfer, info, tsVideo, Path.Combine(directory, "transport.mp4"), null, default);
-    var tsOutput = await StorageFile.GetFileFromPathAsync(Path.Combine(directory, "transport.mp4"));
+    StorageFile tsOutput = await StorageFile.GetFileFromPathAsync(Path.Combine(directory, "transport.mp4"));
     if ((await tsOutput.Properties.GetVideoPropertiesAsync()).Duration.TotalSeconds < .9) throw new Exception("Transport stream was not rendered");
     Console.WriteLine("PASS: MPEG-TS playlist normalized to MP4 using Windows media processing.");
 }
@@ -67,7 +67,7 @@ try { await VideoDownloadWriter.WriteAsync(transfer, info, video, destination, n
 catch (InvalidOperationException) { }
 if (!File.ReadAllBytes(destination).SequenceEqual(original)) throw new Exception("Existing file changed after failure");
 handler.FailAudio = false;
-using var duringRender = new CancellationTokenSource();
+using CancellationTokenSource duringRender = new();
 try
 {
     await VideoDownloadWriter.WriteAsync(transfer, info, video, destination,
@@ -76,7 +76,7 @@ try
 }
 catch (OperationCanceledException) { }
 if (!File.ReadAllBytes(destination).SequenceEqual(original)) throw new Exception("Existing file changed after cancellation");
-using var cancellation = new CancellationTokenSource();
+using CancellationTokenSource cancellation = new();
 cancellation.Cancel();
 try { await VideoDownloadWriter.WriteAsync(transfer, info, video, destination, null, cancellation.Token); throw new Exception("Cancellation expected"); }
 catch (OperationCanceledException) { }

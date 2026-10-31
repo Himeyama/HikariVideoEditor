@@ -21,21 +21,21 @@ public sealed record DownloadVideo(string Id, string Title, TimeSpan Duration,
 // No third-party downloader code or executable is used.
 public sealed class VideoDownloadSource
 {
-    private readonly HttpClient http;
-    public VideoDownloadSource(HttpClient http) => this.http = http;
+    private readonly HttpClient _http;
+    public VideoDownloadSource(HttpClient http) => this._http = http;
 
     public static string ParseId(string input)
     {
-        if (!Uri.TryCreate(input.Trim(), UriKind.Absolute, out var uri) ||
+        if (!Uri.TryCreate(input.Trim(), UriKind.Absolute, out Uri? uri) ||
             uri.Scheme != Uri.UriSchemeHttps || !string.IsNullOrEmpty(uri.UserInfo) || !uri.IsDefaultPort)
             throw new ArgumentException("有効な HTTPS の動画 URL を入力してください。");
-        var host = uri.IdnHost.ToLowerInvariant();
+        string host = uri.IdnHost.ToLowerInvariant();
         string? id = null;
         if (host == "youtu.be")
             id = uri.AbsolutePath.Trim('/');
         else if (host is "youtube.com" or "www.youtube.com" or "m.youtube.com" or "music.youtube.com")
         {
-            var parts = uri.AbsolutePath.Split('/', StringSplitOptions.RemoveEmptyEntries);
+            string[] parts = uri.AbsolutePath.Split('/', StringSplitOptions.RemoveEmptyEntries);
             if (parts.Length == 2 && parts[0] is "shorts" or "embed" or "live")
                 id = parts[1];
             else if (uri.AbsolutePath == "/watch")
@@ -50,24 +50,24 @@ public sealed class VideoDownloadSource
     public async Task<DownloadVideo> ResolveAsync(string input, CancellationToken token,
         IProgress<DownloadProgress>? progress = null)
     {
-        var id = ParseId(input);
+        string id = ParseId(input);
         InvalidOperationException? failure = null;
-        var session = AnonymousVideoSession.Empty;
+        AnonymousVideoSession session = AnonymousVideoSession.Empty;
         // A fresh HTTP session is owned by the dialog. No system browser profile or account cookies are read.
-        foreach (var agent in new[] { AnonymousVideoSession.SafariAgent, AnonymousVideoSession.DesktopAgent })
+        foreach (string agent in new[] { AnonymousVideoSession.SafariAgent, AnonymousVideoSession.DesktopAgent })
         {
             token.ThrowIfCancellationRequested();
             progress?.Report(new DownloadProgress("匿名セッションで動画情報を取得中…", null));
             try
             {
-                using var page = new HttpRequestMessage(HttpMethod.Get, $"https://www.youtube.com/watch?v={id}");
+                using HttpRequestMessage page = new(HttpMethod.Get, $"https://www.youtube.com/watch?v={id}");
                 page.Headers.UserAgent.ParseAdd(agent);
                 page.Headers.AcceptLanguage.ParseAdd("en-US,en;q=0.9");
-                var html = await DownloadHttp.ReadTextAsync(http, page, 8 * 1024 * 1024, token);
+                string html = await DownloadHttp.ReadTextAsync(_http, page, 8 * 1024 * 1024, token);
                 session = AnonymousVideoSession.Parse(html, agent);
                 if (session.Player is { } player)
                 {
-                    var candidate = await ResolvePlayerAsync(id, player, agent, token);
+                    DownloadVideo? candidate = await ResolvePlayerAsync(id, player, agent, token);
                     if (candidate != null) return candidate;
                 }
             }
@@ -76,22 +76,22 @@ public sealed class VideoDownloadSource
         }
         try
         {
-            using var embed = new HttpRequestMessage(HttpMethod.Get, $"https://www.youtube.com/embed/{id}");
+            using HttpRequestMessage embed = new(HttpMethod.Get, $"https://www.youtube.com/embed/{id}");
             embed.Headers.UserAgent.ParseAdd(AnonymousVideoSession.DesktopAgent);
-            var html = await DownloadHttp.ReadTextAsync(http, embed, 8 * 1024 * 1024, token);
-            var embedded = AnonymousVideoSession.Parse(html, AnonymousVideoSession.DesktopAgent);
+            string html = await DownloadHttp.ReadTextAsync(_http, embed, 8 * 1024 * 1024, token);
+            AnonymousVideoSession embedded = AnonymousVideoSession.Parse(html, AnonymousVideoSession.DesktopAgent);
             if (embedded.WebVersion.StartsWith("1.", StringComparison.Ordinal))
                 session = session with { EmbeddedVersion = embedded.WebVersion };
         }
         catch (InvalidOperationException) { }
         catch (HttpRequestException) { }
-        foreach (var client in AnonymousVideoSession.Clients(session))
+        foreach (AnonymousPlaybackClient client in AnonymousVideoSession.Clients(session))
         {
             token.ThrowIfCancellationRequested();
             progress?.Report(new DownloadProgress("別の配信方式で動画情報を確認中…", null));
             try
             {
-                using var request = new HttpRequestMessage(HttpMethod.Post, "https://www.youtube.com/youtubei/v1/player?prettyPrint=false");
+                using HttpRequestMessage request = new(HttpMethod.Post, "https://www.youtube.com/youtubei/v1/player?prettyPrint=false");
                 request.Headers.UserAgent.ParseAdd(client.Agent);
                 request.Headers.Add("X-Youtube-Client-Name", client.Code);
                 request.Headers.Add("X-Youtube-Client-Version", client.Version);
@@ -103,8 +103,8 @@ public sealed class VideoDownloadSource
                     videoId = id, contentCheckOk = true, racyCheckOk = true,
                     playbackContext = new { contentPlaybackContext = new { signatureTimestamp = session.SignatureTimestamp, html5Preference = "HTML5_PREF_WANTS" } }
                 });
-                using var json = JsonDocument.Parse(await DownloadHttp.ReadTextAsync(http, request, 8 * 1024 * 1024, token));
-                var candidate = await ResolvePlayerAsync(id, json.RootElement, client.Agent, token);
+                using JsonDocument json = JsonDocument.Parse(await DownloadHttp.ReadTextAsync(_http, request, 8 * 1024 * 1024, token));
+                DownloadVideo? candidate = await ResolvePlayerAsync(id, json.RootElement, client.Agent, token);
                 if (candidate != null) return candidate;
             }
             catch (InvalidOperationException exception) { failure = exception; }
@@ -118,22 +118,22 @@ public sealed class VideoDownloadSource
         // A successful metadata response alone is insufficient: some clients return formats without URLs.
         try
         {
-            var video = ParsePlayer(id, player);
-            var formats = video.Formats.Select(f => f with { UserAgent = agent }).ToArray();
-            var audio = video.Audio is { } sound ? sound with { UserAgent = agent } : null;
+            DownloadVideo video = ParsePlayer(id, player);
+            DownloadStream[] formats = video.Formats.Select(f => f with { UserAgent = agent }).ToArray();
+            DownloadStream? audio = video.Audio is { } sound ? sound with { UserAgent = agent } : null;
             // Reject unusable signatures/tokens before offering these formats to the user.
             if (await CanReadAsync(formats[^1], token) && (audio == null || await CanReadAsync(audio, token)))
                 return video with { Formats = formats, Audio = audio };
         }
         catch (InvalidOperationException) when (player.TryGetProperty("streamingData", out _)) { }
-        if (player.TryGetProperty("playabilityStatus", out var status) && Text(status, "status") == "OK" &&
-            player.TryGetProperty("streamingData", out var data) &&
-            Uri.TryCreate(Text(data, "hlsManifestUrl"), UriKind.Absolute, out var manifest) && IsMediaUrl(manifest))
+        if (player.TryGetProperty("playabilityStatus", out JsonElement status) && Text(status, "status") == "OK" &&
+            player.TryGetProperty("streamingData", out JsonElement data) &&
+            Uri.TryCreate(Text(data, "hlsManifestUrl"), UriKind.Absolute, out Uri? manifest) && IsMediaUrl(manifest))
         {
-            var details = player.GetProperty("videoDetails");
-            if (details.TryGetProperty("isLiveContent", out var live) && live.ValueKind == JsonValueKind.True)
+            JsonElement details = player.GetProperty("videoDetails");
+            if (details.TryGetProperty("isLiveContent", out JsonElement live) && live.ValueKind == JsonValueKind.True)
                 throw new InvalidOperationException("ライブ形式の動画には対応していません。");
-            var formats = await new VideoDownloadHls(http).GetFormatsAsync(manifest, agent, token);
+            IReadOnlyList<DownloadStream> formats = await new VideoDownloadHls(_http).GetFormatsAsync(manifest, agent, token);
             if (formats.Count > 0)
                 return new DownloadVideo(id, Text(details, "title"), TimeSpan.FromSeconds(Number(details, "lengthSeconds")), formats, null);
         }
@@ -142,43 +142,43 @@ public sealed class VideoDownloadSource
 
     private async Task<bool> CanReadAsync(DownloadStream stream, CancellationToken token)
     {
-        using var response = await DownloadHttp.OpenMediaAsync(http, stream.Url, stream.UserAgent, token, probe: true);
+        using HttpResponseMessage response = await DownloadHttp.OpenMediaAsync(_http, stream.Url, stream.UserAgent, token, probe: true);
         if (!response.IsSuccessStatusCode || response.Content.Headers.ContentType?.MediaType is "text/html" or "application/json") return false;
-        await using var body = await response.Content.ReadAsStreamAsync(token);
+        await using Stream body = await response.Content.ReadAsStreamAsync(token);
         return await body.ReadAsync(new byte[1], token) == 1;
     }
 
     public static DownloadVideo ParsePlayer(string id, JsonElement root)
     {
-        if (root.TryGetProperty("playabilityStatus", out var restricted) && Text(restricted, "status") == "LOGIN_REQUIRED")
+        if (root.TryGetProperty("playabilityStatus", out JsonElement restricted) && Text(restricted, "status") == "LOGIN_REQUIRED")
             throw new InvalidOperationException("配信元がログインまたは本人確認を要求しています。この動画は現在取得できません。");
-        if (!root.TryGetProperty("playabilityStatus", out var status) || Text(status, "status") != "OK")
+        if (!root.TryGetProperty("playabilityStatus", out JsonElement status) || Text(status, "status") != "OK")
             throw new InvalidOperationException("この動画は取得できません。公開状態や視聴条件を確認してください。");
-        if (!root.TryGetProperty("videoDetails", out var details) ||
-            (details.TryGetProperty("isLiveContent", out var live) && live.ValueKind == JsonValueKind.True))
+        if (!root.TryGetProperty("videoDetails", out JsonElement details) ||
+            (details.TryGetProperty("isLiveContent", out JsonElement live) && live.ValueKind == JsonValueKind.True))
             throw new InvalidOperationException("ライブ形式の動画には対応していません。");
-        if (!root.TryGetProperty("streamingData", out var data))
+        if (!root.TryGetProperty("streamingData", out JsonElement data))
             throw new InvalidOperationException("動画の配信情報がありません。");
-        var streams = new List<DownloadStream>();
-        foreach (var key in new[] { "formats", "adaptiveFormats" })
+        List<DownloadStream> streams = new();
+        foreach (string key in new[] { "formats", "adaptiveFormats" })
         {
-            if (!data.TryGetProperty(key, out var formats)) continue;
-            foreach (var item in formats.EnumerateArray())
+            if (!data.TryGetProperty(key, out JsonElement formats)) continue;
+            foreach (JsonElement item in formats.EnumerateArray())
             {
-                var mime = Text(item, "mimeType");
+                string mime = Text(item, "mimeType");
                 if (item.TryGetProperty("drmFamilies", out _) || item.TryGetProperty("drmTrackType", out _) ||
-                    !Uri.TryCreate(Text(item, "url"), UriKind.Absolute, out var url) || !IsMediaUrl(url)) continue;
+                    !Uri.TryCreate(Text(item, "url"), UriKind.Absolute, out Uri? url) || !IsMediaUrl(url)) continue;
                 bool video = mime.StartsWith("video/mp4", StringComparison.Ordinal) && mime.Contains("avc1", StringComparison.Ordinal);
                 bool audio = mime.StartsWith("audio/mp4", StringComparison.Ordinal) && mime.Contains("mp4a", StringComparison.Ordinal);
                 if (!video && !audio) continue;
-                var size = Number(item, "contentLength");
+                long size = Number(item, "contentLength");
                 streams.Add(new DownloadStream(url, mime, size > 0 ? size : null,
                     (int)Number(item, "height"), (int)Number(item, "fps"), Number(item, "bitrate"),
                     audio || mime.Contains("mp4a", StringComparison.Ordinal)));
             }
         }
-        var sound = streams.Where(s => s.Height == 0 && s.HasAudio).OrderByDescending(s => s.Bitrate).FirstOrDefault();
-        var choices = streams.Where(s => s.Height > 0 && (s.HasAudio || sound != null))
+        DownloadStream? sound = streams.Where(s => s.Height == 0 && s.HasAudio).OrderByDescending(s => s.Bitrate).FirstOrDefault();
+        DownloadStream[] choices = streams.Where(s => s.Height > 0 && (s.HasAudio || sound != null))
             .OrderByDescending(s => s.Height).ThenByDescending(s => s.Fps).ThenByDescending(s => s.Bitrate)
             .DistinctBy(s => (s.Height, s.Fps)).ToArray();
         if (choices.Length == 0)
@@ -189,16 +189,16 @@ public sealed class VideoDownloadSource
     public static bool IsMediaUrl(Uri uri) => uri.Scheme == Uri.UriSchemeHttps && uri.IsDefaultPort &&
         string.IsNullOrEmpty(uri.UserInfo) && uri.IdnHost.EndsWith(".googlevideo.com", StringComparison.OrdinalIgnoreCase);
 
-    private static string Text(JsonElement item, string key) => item.TryGetProperty(key, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() ?? "" : "";
-    private static long Number(JsonElement item, string key) => item.TryGetProperty(key, out var value) && long.TryParse(value.ToString(), out var number) ? number : 0;
+    private static string Text(JsonElement item, string key) => item.TryGetProperty(key, out JsonElement value) && value.ValueKind == JsonValueKind.String ? value.GetString() ?? "" : "";
+    private static long Number(JsonElement item, string key) => item.TryGetProperty(key, out JsonElement value) && long.TryParse(value.ToString(), out long number) ? number : 0;
 }
 
 public sealed record DownloadProgress(string Stage, double? Percent);
 
 public sealed class VideoDownloadTransfer
 {
-    private readonly HttpClient http;
-    public VideoDownloadTransfer(HttpClient http) => this.http = http;
+    private readonly HttpClient _http;
+    public VideoDownloadTransfer(HttpClient http) => this._http = http;
 
     public async Task SaveStreamAsync(DownloadStream stream, string path, string stage,
         IProgress<DownloadProgress>? progress, CancellationToken token)
@@ -206,23 +206,23 @@ public sealed class VideoDownloadTransfer
         if (!VideoDownloadSource.IsMediaUrl(stream.Url)) throw new ArgumentException("配信 URL が不正です。");
         if (stream.IsHls)
         {
-            await new VideoDownloadHls(http).SaveAsync(stream, path, stage, progress, token);
+            await new VideoDownloadHls(_http).SaveAsync(stream, path, stage, progress, token);
             return;
         }
         for (int attempt = 0; ; attempt++)
         {
             try
             {
-                using var response = await DownloadHttp.OpenMediaAsync(http, stream.Url, stream.UserAgent, token);
+                using HttpResponseMessage response = await DownloadHttp.OpenMediaAsync(_http, stream.Url, stream.UserAgent, token);
                 if (response.StatusCode == HttpStatusCode.Forbidden)
                     throw new InvalidOperationException("配信元がダウンロードを許可しませんでした。動画情報を取得し直してください。");
                 response.EnsureSuccessStatusCode();
                 if (response.Content.Headers.ContentType?.MediaType is "text/html" or "application/json")
                     throw new InvalidOperationException("配信元から動画データが返されませんでした。");
-                var expected = stream.Size ?? response.Content.Headers.ContentLength;
-                await using var input = await response.Content.ReadAsStreamAsync(token);
-                await using var output = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None, 131072, true);
-                var buffer = new byte[131072];
+                long? expected = stream.Size ?? response.Content.Headers.ContentLength;
+                await using Stream input = await response.Content.ReadAsStreamAsync(token);
+                await using FileStream output = new(path, FileMode.Create, FileAccess.Write, FileShare.None, 131072, true);
+                byte[] buffer = new byte[131072];
                 long total = 0;
                 int read;
                 while ((read = await ReadWithTimeoutAsync(input, buffer, token)) > 0)
@@ -247,7 +247,7 @@ public sealed class VideoDownloadTransfer
 
     private static async Task<int> ReadWithTimeoutAsync(Stream input, byte[] buffer, CancellationToken token)
     {
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(token);
+        using CancellationTokenSource timeout = CancellationTokenSource.CreateLinkedTokenSource(token);
         timeout.CancelAfter(TimeSpan.FromSeconds(60));
         try { return await input.ReadAsync(buffer, timeout.Token); }
         catch (OperationCanceledException) when (!token.IsCancellationRequested)

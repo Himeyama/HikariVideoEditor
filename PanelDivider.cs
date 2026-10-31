@@ -17,29 +17,29 @@ public sealed class PanelDivider : Control
     public event EventHandler? DragStarted;
     public event EventHandler<PanelDragDeltaEventArgs>? DragDelta;
     public event EventHandler? DragCompleted;
-    private uint? pointerId;
-    private Point previousPoint;
+    private uint? _pointerId;
+    private Point _previousPoint;
     public PanelDivider()
     {
         IsTabStop = false;
         Loaded += (_, _) => ProtectedCursor = InputSystemCursor.Create(IsHorizontal ? InputSystemCursorShape.SizeNorthSouth : InputSystemCursorShape.SizeWestEast);
         PointerPressed += (_, args) =>
         {
-            var pointer = args.GetCurrentPoint(null);
-            if (pointerId != null || !pointer.Properties.IsLeftButtonPressed || !CapturePointer(args.Pointer))
+            PointerPoint pointer = args.GetCurrentPoint(null);
+            if (_pointerId != null || !pointer.Properties.IsLeftButtonPressed || !CapturePointer(args.Pointer))
                 return;
-            pointerId = args.Pointer.PointerId;
-            previousPoint = pointer.Position;
+            _pointerId = args.Pointer.PointerId;
+            _previousPoint = pointer.Position;
             DragStarted?.Invoke(this, EventArgs.Empty);
             args.Handled = true;
         };
         PointerMoved += (_, args) =>
         {
-            if (pointerId != args.Pointer.PointerId)
+            if (_pointerId != args.Pointer.PointerId)
                 return;
-            var point = args.GetCurrentPoint(null).Position;
-            DragDelta?.Invoke(this, new PanelDragDeltaEventArgs(point.X - previousPoint.X, point.Y - previousPoint.Y));
-            previousPoint = point;
+            Point point = args.GetCurrentPoint(null).Position;
+            DragDelta?.Invoke(this, new PanelDragDeltaEventArgs(point.X - _previousPoint.X, point.Y - _previousPoint.Y));
+            _previousPoint = point;
             args.Handled = true;
         };
         PointerReleased += (_, args) => FinishDrag(args.Pointer.PointerId);
@@ -49,9 +49,9 @@ public sealed class PanelDivider : Control
 
     private void FinishDrag(uint id)
     {
-        if (pointerId != id)
+        if (_pointerId != id)
             return;
-        pointerId = null;
+        _pointerId = null;
         ReleasePointerCaptures();
         DragCompleted?.Invoke(this, EventArgs.Empty);
     }

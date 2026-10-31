@@ -12,15 +12,15 @@ public sealed partial class MainWindow
     private void ConfigureWindow()
     {
         // XAML sizes are DIPs; AppWindow sizes and caption insets are physical pixels.
-        var dpi = GetDpiForWindow(WinRT.Interop.WindowNative.GetWindowHandle(this));
-        var scale = dpi == 0 ? 1 : dpi / 96.0;
-        var area = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Nearest).WorkArea;
+        uint dpi = GetDpiForWindow(WinRT.Interop.WindowNative.GetWindowHandle(this));
+        double scale = dpi == 0 ? 1 : dpi / 96.0;
+        Windows.Graphics.RectInt32 area = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Nearest).WorkArea;
         AppWindow.Resize(new Windows.Graphics.SizeInt32(Math.Min((int)Math.Round(1500 * scale), area.Width), Math.Min((int)Math.Round(980 * scale), area.Height)));
         ExtendsContentIntoTitleBar = true;
         SystemBackdrop = new MicaBackdrop();
         SetTitleBar(TitleDragRegion);
         AppWindow.TitleBar.PreferredHeightOption = TitleBarHeightOption.Tall;
-        var bar = AppWindow.TitleBar;
+        AppWindowTitleBar bar = AppWindow.TitleBar;
         bar.ButtonBackgroundColor = Color.FromArgb(0, 0, 0, 0);
         bar.ButtonInactiveBackgroundColor = Color.FromArgb(0, 0, 0, 0);
         Root.ActualThemeChanged += (_, _) => UpdateCaptionTheme();
@@ -29,9 +29,9 @@ public sealed partial class MainWindow
         {
             Root.XamlRoot.Changed += XamlRoot_Changed;
             UpdateTitleBarInsets();
-            ApplyPanelLayout(preferredLayout);
+            ApplyPanelLayout(_preferredLayout);
         };
-        Workspace.Loaded += (_, _) => ApplyPanelLayout(preferredLayout);
+        Workspace.Loaded += (_, _) => ApplyPanelLayout(_preferredLayout);
         AppWindow.Changed += (_, _) => UpdateTitleBarInsets();
     }
 
@@ -47,7 +47,7 @@ public sealed partial class MainWindow
     {
         if (CustomTitleBar == null || Root.XamlRoot == null)
             return;
-        var scale = Root.XamlRoot.RasterizationScale * preferences.Scale;
+        double scale = Root.XamlRoot.RasterizationScale * _preferences.Scale;
         TitleLeftInset.Width = new GridLength(AppWindow.TitleBar.LeftInset / scale);
         TitleRightInset.Width = new GridLength(AppWindow.TitleBar.RightInset / scale);
     }

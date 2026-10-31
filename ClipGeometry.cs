@@ -27,7 +27,7 @@ public static class ClipGeometry
 
     public static EditClip Move(EditClip original, double deltaX, double deltaY)
     {
-        var moved = ClipEditing.Clone(original);
+        EditClip moved = ClipEditing.Clone(original);
         moved.OffsetX += deltaX;
         moved.OffsetY += deltaY;
         return moved;
@@ -35,8 +35,8 @@ public static class ClipGeometry
 
     public static EditClip SnapToCanvas(EditClip candidate, double sourceWidth, double sourceHeight, VideoSettings video, double tolerance)
     {
-        var bounds = Fit(candidate, sourceWidth, sourceHeight, video);
-        var snapped = ClipEditing.Clone(candidate);
+        ClipBounds bounds = Fit(candidate, sourceWidth, sourceHeight, video);
+        EditClip snapped = ClipEditing.Clone(candidate);
         double left = -bounds.X;
         double right = video.Width - bounds.Right;
         double top = -bounds.Y;
@@ -63,7 +63,7 @@ public static class ClipGeometry
         double height = bounds.Height * factor;
         double newX = left ? anchorX - width : anchorX;
         double newY = top ? anchorY - height : anchorY;
-        var resized = ClipEditing.Clone(original);
+        EditClip resized = ClipEditing.Clone(original);
         resized.Scale *= factor;
         resized.OffsetX += newX + width / 2 - (bounds.X + bounds.Width / 2);
         resized.OffsetY += newY + height / 2 - (bounds.Y + bounds.Height / 2);
@@ -72,7 +72,7 @@ public static class ClipGeometry
 
     public static EditClip ResizeEdge(EditClip original, ClipBounds bounds, double deltaX, double deltaY, int horizontal, int vertical)
     {
-        var resized = ClipEditing.Clone(original);
+        EditClip resized = ClipEditing.Clone(original);
         if (horizontal != 0)
         {
             double factor = Math.Clamp((bounds.Width + horizontal * deltaX) / bounds.Width, .01 / original.ScaleX, 100 / original.ScaleX);

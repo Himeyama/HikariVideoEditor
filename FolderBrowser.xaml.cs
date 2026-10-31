@@ -8,7 +8,7 @@ public sealed partial class FolderBrowser : UserControl
 {
     public string? CurrentDirectory { get; private set; }
 
-    private int navigationVersion;
+    private int _navigationVersion;
     public async Task<bool> ConfirmSelection()
     {
         string requested = Address.Text;
@@ -28,12 +28,12 @@ public sealed partial class FolderBrowser : UserControl
 
     public async Task Navigate(string path)
     {
-        int version = ++navigationVersion;
+        int version = ++_navigationVersion;
         try
         {
             string fullPath = Path.GetFullPath(path);
-            var entries = await Task.Run(() => WorkspaceEntry.ReadDirectory(fullPath, foldersOnly: true));
-            if (version != navigationVersion)
+            List<WorkspaceEntry> entries = await Task.Run(() => WorkspaceEntry.ReadDirectory(fullPath, foldersOnly: true));
+            if (version != _navigationVersion)
                 return;
             CurrentDirectory = fullPath;
             Address.Text = fullPath;
@@ -42,7 +42,7 @@ public sealed partial class FolderBrowser : UserControl
         }
         catch (Exception exception)when (exception is IOException or UnauthorizedAccessException or ArgumentException)
         {
-            if (version == navigationVersion)
+            if (version == _navigationVersion)
                 ErrorText.Text = exception.Message;
         }
     }

@@ -5,11 +5,11 @@ namespace VideoEditor;
 
 public sealed class PreviewInteractionCanvas : Canvas
 {
-    private readonly Dictionary<InputSystemCursorShape, InputSystemCursor> cursors = new();
+    private readonly Dictionary<InputSystemCursorShape, InputSystemCursor> _cursors = new();
     public void SetCursor(InputSystemCursorShape shape)
     {
-        if (!cursors.TryGetValue(shape, out var cursor))
-            cursors[shape] = cursor = InputSystemCursor.Create(shape);
+        if (!_cursors.TryGetValue(shape, out InputSystemCursor? cursor))
+            _cursors[shape] = cursor = InputSystemCursor.Create(shape);
         ProtectedCursor = cursor;
     }
 }

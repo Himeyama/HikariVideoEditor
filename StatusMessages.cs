@@ -5,31 +5,31 @@ namespace VideoEditor;
 
 public sealed partial class MainWindow
 {
-    private readonly DispatcherTimer statusMessageTimer = new()
+    private readonly DispatcherTimer _statusMessageTimer = new()
     {
         Interval = TimeSpan.FromSeconds(3)
     };
-    private long statusMessageSubscription;
+    private long _statusMessageSubscription;
 
     private void InitializeStatusMessages()
     {
-        statusMessageTimer.Tick += (_, _) =>
+        _statusMessageTimer.Tick += (_, _) =>
         {
-            statusMessageTimer.Stop();
+            _statusMessageTimer.Stop();
             Status.Text = "";
         };
 
-        statusMessageSubscription = Status.RegisterPropertyChangedCallback(TextBlock.TextProperty, (_, _) =>
+        _statusMessageSubscription = Status.RegisterPropertyChangedCallback(TextBlock.TextProperty, (_, _) =>
         {
-            statusMessageTimer.Stop();
+            _statusMessageTimer.Stop();
             if (!string.IsNullOrWhiteSpace(Status.Text))
-                statusMessageTimer.Start();
+                _statusMessageTimer.Start();
         });
     }
 
     private void DisposeStatusMessages()
     {
-        statusMessageTimer.Stop();
-        Status.UnregisterPropertyChangedCallback(TextBlock.TextProperty, statusMessageSubscription);
+        _statusMessageTimer.Stop();
+        Status.UnregisterPropertyChangedCallback(TextBlock.TextProperty, _statusMessageSubscription);
     }
 }

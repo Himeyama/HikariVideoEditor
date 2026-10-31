@@ -7,7 +7,7 @@ public static class ClipEditing
     public static double Snap(double seconds) => Math.Round(seconds * FrameRate) / FrameRate;
     public static EditClip Move(EditClip original, double delta, int layerDelta)
     {
-        var next = Clone(original);
+        EditClip next = Clone(original);
         next.Start = Math.Clamp(Snap(original.Start + delta), 0, 86400 - original.Duration);
         next.Layer = Math.Clamp(original.Layer + layerDelta, 1, 2000);
         return next;
@@ -15,10 +15,10 @@ public static class ClipEditing
 
     public static EditClip Resize(EditClip original, double delta, bool left, double sourceDuration)
     {
-        var next = Clone(original);
+        EditClip next = Clone(original);
         if (left)
         {
-            var lower = original.IsStill ? -original.Start : -Math.Min(original.Start, original.Trim);
+            double lower = original.IsStill ? -original.Start : -Math.Min(original.Start, original.Trim);
             delta = Math.Clamp(Snap(delta), lower, original.Duration - MinimumDuration);
             next.Start += delta;
             next.Duration -= delta;
@@ -27,7 +27,7 @@ public static class ClipEditing
         }
         else
         {
-            var maximum = Math.Min(86400 - original.Start, original.IsStill ? 86400 : sourceDuration - original.Trim);
+            double maximum = Math.Min(86400 - original.Start, original.IsStill ? 86400 : sourceDuration - original.Trim);
             next.Duration = Math.Clamp(Snap(original.Duration + delta), MinimumDuration, maximum);
         }
 
@@ -38,11 +38,11 @@ public static class ClipEditing
     {
         if (!double.IsFinite(seconds))
             throw new ArgumentException("分割位置が不正です。");
-        var offset = Snap(seconds - original.Start);
+        double offset = Snap(seconds - original.Start);
         if (offset < MinimumDuration - 1e-8 || original.Duration - offset < MinimumDuration - 1e-8)
             throw new ArgumentException("クリップの内側に再生位置を移動してください。");
-        var left = Clone(original);
-        var right = Clone(original);
+        EditClip left = Clone(original);
+        EditClip right = Clone(original);
         left.Duration = offset;
         right.Id = Guid.NewGuid().ToString("N");
         right.Start = original.Start + offset;
@@ -54,11 +54,11 @@ public static class ClipEditing
 
     public static EditClip SnapToEdges(EditClip candidate, IEnumerable<EditClip> clips, int edge, double tolerance, double sourceDuration)
     {
-        var result = candidate;
-        var best = tolerance + 1e-9;
-        var targets = clips.Where(c => c.Id != candidate.Id).SelectMany(c => new[] { c.Start, c.Start + c.Duration }).Append(0);
-        foreach (var target in targets)
-            foreach (var movingEdge in edge == 0 ? new[]
+        EditClip result = candidate;
+        double best = tolerance + 1e-9;
+        IEnumerable<double> targets = clips.Where(c => c.Id != candidate.Id).SelectMany(c => new[] { c.Start, c.Start + c.Duration }).Append(0);
+        foreach (double target in targets)
+            foreach (int movingEdge in edge == 0 ? new[]
             {
                 -1,
                 1
@@ -71,10 +71,10 @@ public static class ClipEditing
 
             )
             {
-                var difference = target - (movingEdge == -1 ? candidate.Start : candidate.Start + candidate.Duration);
+                double difference = target - (movingEdge == -1 ? candidate.Start : candidate.Start + candidate.Duration);
                 if (Math.Abs(difference) >= best)
                     continue;
-                var next = Clone(candidate);
+                EditClip next = Clone(candidate);
                 if (edge == 0)
                     next.Start += difference;
                 else if (edge == -1)
@@ -97,7 +97,7 @@ public static class ClipEditing
 
     public static EditClip Duplicate(EditClip original)
     {
-        var duplicate = Clone(original);
+        EditClip duplicate = Clone(original);
         duplicate.Id = Guid.NewGuid().ToString("N");
         duplicate.Start = original.Start + original.Duration;
         if (duplicate.Start + duplicate.Duration > 86400)
@@ -113,7 +113,7 @@ public static class ClipEditing
         int layers = Math.Clamp(layerDelta, 1 - originals.Min(clip => clip.Layer), 2000 - originals.Max(clip => clip.Layer));
         return originals.Select(clip =>
         {
-            var moved = Clone(clip);
+            EditClip moved = Clone(clip);
             moved.Start += movement;
             moved.Layer += layers;
             return moved;

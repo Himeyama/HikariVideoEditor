@@ -7,83 +7,83 @@ using Windows.Media.Playback;
 namespace VideoEditor;
 public sealed partial class MainWindow
 {
-    private long stillVersion;
-    private long stillEpoch;
-    private bool stillWorker;
-    private bool NeedsStill => scrubPointer != null || (!playbackIntent && Preview.MediaPlayer.PlaybackSession.PlaybackState != MediaPlaybackState.Playing && !resumePlayback);
+    private long _stillVersion;
+    private long _stillEpoch;
+    private bool _stillWorker;
+    private bool NeedsStill => _scrubPointer != null || (!_playbackIntent && Preview.MediaPlayer.PlaybackSession.PlaybackState != MediaPlaybackState.Playing && !_resumePlayback);
 
     private void HideStill()
     {
-        stillVersion++;
-        stillEpoch++;
+        _stillVersion++;
+        _stillEpoch++;
         PausedPreview.Visibility = Visibility.Collapsed;
         UpdateTransformOverlay();
     }
 
     private async void RequestStill()
     {
-        stillVersion++;
-        if (stillWorker || closed || !NeedsStill)
+        _stillVersion++;
+        if (_stillWorker || _closed || !NeedsStill)
             return;
-        stillWorker = true;
+        _stillWorker = true;
         try
         {
-            while (!closed && NeedsStill)
+            while (!_closed && NeedsStill)
             {
                 // Coalesce pointer events and discard late frames from earlier positions.
                 await Task.Delay(32);
-                var version = stillVersion;
-                var epoch = stillEpoch;
-                var snapshot = project.Copy();
-                var position = Math.Min(playhead, Math.Max(0, ProjectEnd - 1.0 / project.Video.FrameRate));
-                var layers = await StillPreview.ReadLayers(snapshot, position);
-                var visuals = new List<PreviewVisual>();
+                long version = _stillVersion;
+                long epoch = _stillEpoch;
+                EditProject snapshot = _project.Copy();
+                double position = Math.Min(_playhead, Math.Max(0, ProjectEnd - 1.0 / _project.Video.FrameRate));
+                List<StillPreview.Layer> layers = await StillPreview.ReadLayers(snapshot, position);
+                List<PreviewVisual> visuals = new();
                 try
                 {
-                    foreach (var layer in layers)
+                    foreach (StillPreview.Layer layer in layers)
                     {
-                        var bitmap = new BitmapImage();
+                        BitmapImage bitmap = new();
                         await bitmap.SetSourceAsync(layer.Stream);
-                        var image = new Image
+                        Image image = new()
                         {
                             Source = bitmap,
                             Stretch = Stretch.Fill
                         };
-                        var bounds = ClipGeometry.Fit(layer.Clip, bitmap.PixelWidth, bitmap.PixelHeight, snapshot.Video);
+                        ClipBounds bounds = ClipGeometry.Fit(layer.Clip, bitmap.PixelWidth, bitmap.PixelHeight, snapshot.Video);
                         PlacePreviewImage(image, bounds);
                         visuals.Add(new PreviewVisual(layer.Clip, image, bounds, bitmap.PixelWidth, bitmap.PixelHeight));
                     }
                 }
                 finally
                 {
-                    foreach (var layer in layers)
+                    foreach (StillPreview.Layer layer in layers)
                         layer.Stream.Dispose();
                 }
 
-                if (closed || !NeedsStill)
+                if (_closed || !NeedsStill)
                     break;
-                if (previewDrag != null)
+                if (_previewDrag != null)
                     break;
-                if (epoch != stillEpoch)
+                if (epoch != _stillEpoch)
                     continue;
                 PausedFrames.Children.Clear();
-                previewVisuals = visuals;
-                foreach (var visual in visuals)
+                _previewVisuals = visuals;
+                foreach (PreviewVisual visual in visuals)
                     PausedFrames.Children.Add(visual.Image);
                 PausedPreview.Visibility = Visibility.Visible;
                 UpdateTransformOverlay();
-                if (version == stillVersion)
+                if (version == _stillVersion)
                     break;
             }
         }
         catch (Exception ex)
         {
-            if (!closed)
+            if (!_closed)
                 Status.Text = $"停止フレームを表示できません: {ex.Message}";
         }
         finally
         {
-            stillWorker = false;
+            _stillWorker = false;
         }
     }
 }

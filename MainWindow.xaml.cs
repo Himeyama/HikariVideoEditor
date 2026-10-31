@@ -12,16 +12,16 @@ using Windows.UI;
 namespace VideoEditor;
 public sealed partial class MainWindow : Window
 {
-    private EditProject project = new();
-    private readonly Stack<EditProject> undo = new();
-    private readonly Stack<EditProject> redo = new();
-    private string? selected;
-    private readonly Bridge bridge;
-    private readonly SemaphoreSlim gate = new(1, 1);
-    private MediaComposition? composition;
-    private MediaSource? source;
-    private MediaStreamSource? previewStream;
-    private bool closed;
+    private EditProject _project = new();
+    private readonly Stack<EditProject> _undo = new();
+    private readonly Stack<EditProject> _redo = new();
+    private string? _selected;
+    private readonly Bridge _bridge;
+    private readonly SemaphoreSlim _gate = new(1, 1);
+    private MediaComposition? _composition;
+    private MediaSource? _source;
+    private MediaStreamSource? _previewStream;
+    private bool _closed;
     public MainWindow()
     {
         InitializeComponent();
@@ -29,7 +29,7 @@ public sealed partial class MainWindow : Window
         InitializePages();
         InitializeStatusMessages();
         Title = "Video Editor";
-        var secondsFormat = new Windows.Globalization.NumberFormatting.DecimalFormatter
+        Windows.Globalization.NumberFormatting.DecimalFormatter secondsFormat = new()
         {
             FractionDigits = 2,
             IntegerDigits = 1,
@@ -46,39 +46,39 @@ public sealed partial class MainWindow : Window
         FadeInInput.NumberFormatter = secondsFormat;
         FadeOutInput.NumberFormatter = secondsFormat;
         LayerInput.NumberFormatter = new Windows.Globalization.NumberFormatting.DecimalFormatter { FractionDigits = 0, IntegerDigits = 1 };
-        foreach (var input in new[] { StartInput, TrimInput, DurationInput, LayerInput, VolumeInput, FadeInInput, FadeOutInput })
+        foreach (NumberBox input in new[] { StartInput, TrimInput, DurationInput, LayerInput, VolumeInput, FadeInInput, FadeOutInput })
             input.LostFocus += ObjectInput_LostFocus;
         ConfigureWindow();
         ApplyAppScale();
         InitializePlayback();
-        bridge = new Bridge(DispatchCommand);
+        _bridge = new Bridge(DispatchCommand);
         Closed += (_, _) =>
         {
             SavePanelLayout();
-            closed = true;
-            workspaceWatcher?.Dispose();
-            workspaceRefreshTimer?.Stop();
-            exportCancellation?.Cancel();
-            downloadCancellation?.Cancel();
-            playbackTimer.Stop();
+            _closed = true;
+            _workspaceWatcher?.Dispose();
+            _workspaceRefreshTimer?.Stop();
+            _exportCancellation?.Cancel();
+            _downloadCancellation?.Cancel();
+            _playbackTimer.Stop();
             DisposeStatusMessages();
             if (Root.XamlRoot != null)
                 Root.XamlRoot.Changed -= XamlRoot_Changed;
-            bridge.Dispose();
+            _bridge.Dispose();
             Preview.MediaPlayer?.Dispose();
-            source?.Dispose();
+            _source?.Dispose();
         };
         Draw();
-        McpPortStatus.Text = $":{bridge.Port}";
+        McpPortStatus.Text = $":{_bridge.Port}";
         InitializeVoicevox();
     }
 
     private async Task Run(Func<Task> action)
     {
-        await gate.WaitAsync();
+        await _gate.WaitAsync();
         try
         {
-            var previous = ProjectSnapshot();
+            string previous = ProjectSnapshot();
             await action();
             await AutoSaveChanges(previous);
         }
@@ -88,39 +88,39 @@ public sealed partial class MainWindow : Window
         }
         finally
         {
-            gate.Release();
+            _gate.Release();
         }
     }
 
     private void Remember()
     {
-        Remember(project);
+        Remember(_project);
     }
 
     private void Remember(EditProject previous)
     {
-        undo.Push(previous.Copy());
-        redo.Clear();
+        _undo.Push(previous.Copy());
+        _redo.Clear();
         UpdateHistoryButtons();
     }
 
     private void UpdateHistoryButtons()
     {
-        UndoButton.IsEnabled = undo.Count > 0;
-        RedoButton.IsEnabled = redo.Count > 0;
+        UndoButton.IsEnabled = _undo.Count > 0;
+        RedoButton.IsEnabled = _redo.Count > 0;
     }
 
     private void Draw()
     {
         UpdateGenerationAvailability();
         UpdateHistoryButtons();
-        ClipEditing.FrameRate = project.Video.FrameRate;
-        if (selected == null)
+        ClipEditing.FrameRate = _project.Video.FrameRate;
+        if (_selected == null)
         {
             DisplaySubtitleSettings(null);
             AudioInspector.Visibility = Visibility.Collapsed;
         }
-        selectedIds.RemoveWhere(id => !project.Clips.Any(clip => clip.Id == id));
+        _selectedIds.RemoveWhere(id => !_project.Clips.Any(clip => clip.Id == id));
         UpdateVideoCanvas();
         DrawTimeline();
     }
@@ -128,10 +128,10 @@ public sealed partial class MainWindow : Window
     private void Select(EditClip c, bool redraw = true, bool preserveSelection = false)
     {
         if (!preserveSelection)
-            selectedIds.Clear();
-        selectedIds.Add(c.Id);
-        selected = c.Id;
-        SelectedName.Text = selectedIds.Count > 1 ? $"{selectedIds.Count} 素材を選択" : c.ToString();
+            _selectedIds.Clear();
+        _selectedIds.Add(c.Id);
+        _selected = c.Id;
+        SelectedName.Text = _selectedIds.Count > 1 ? $"{_selectedIds.Count} 素材を選択" : c.ToString();
         DisplayObjectValues(c);
         DisplaySubtitleSettings(c);
         UpdateTransformOverlay();
@@ -142,14 +142,14 @@ public sealed partial class MainWindow : Window
     private async Task<EditClip> Add(string path, double? insertionTime = null)
     {
         path = Path.GetFullPath(path);
-        var kind = MediaFiles.Kind(path);
-        var c = new EditClip
+        string kind = MediaFiles.Kind(path);
+        EditClip c = new()
         {
             Path = path,
             Kind = kind,
-            Start = project.Clips.Select(x => x.Start + x.Duration).DefaultIfEmpty(0).Max()
+            Start = _project.Clips.Select(x => x.Start + x.Duration).DefaultIfEmpty(0).Max()
         };
-        var file = await StorageFile.GetFileFromPathAsync(path);
+        StorageFile file = await StorageFile.GetFileFromPathAsync(path);
         if (kind == "video")
             c.Duration = (await MediaClip.CreateFromFileAsync(file)).OriginalDuration.TotalSeconds;
         if (kind == "audio")
@@ -157,14 +157,14 @@ public sealed partial class MainWindow : Window
         if (insertionTime.HasValue)
         {
             c.Start = insertionTime.Value;
-            c.Layer = ClipPlacement.FirstAvailableLayer(project.Clips, c.Start, c.Duration);
+            c.Layer = ClipPlacement.FirstAvailableLayer(_project.Clips, c.Start, c.Duration);
         }
 
         c.Validate();
-        while (project.Layer(c.Layer).Locked && c.Layer < 2000) c.Layer++;
-        project.RequireEditable(c.Layer);
+        while (_project.Layer(c.Layer).Locked && c.Layer < 2000) c.Layer++;
+        _project.RequireEditable(c.Layer);
         Remember();
-        project.Clips.Add(c);
+        _project.Clips.Add(c);
         Select(c);
         return c;
     }
@@ -174,41 +174,41 @@ public sealed partial class MainWindow : Window
     {
         // Use the desktop dialog: the WinRT picker can return E_ACCESSDENIED
         // when this unpackaged desktop app inherits an elevated process token.
-        using var picker = new System.Windows.Forms.OpenFileDialog
+        using System.Windows.Forms.OpenFileDialog picker = new()
         {
             Title = "素材を追加",
             Filter = $"対応する素材|{string.Join(";", MediaFiles.Extensions.Select(extension => "*" + extension))}",
             Multiselect = true,
             CheckFileExists = true,
-            InitialDirectory = workspaceCurrentDirectory ?? Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+            InitialDirectory = _workspaceCurrentDirectory ?? Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
             RestoreDirectory = true
         };
-        var owner = new FileDialogOwner(WinRT.Interop.WindowNative.GetWindowHandle(this));
+        FileDialogOwner owner = new(WinRT.Interop.WindowNative.GetWindowHandle(this));
         if (picker.ShowDialog(owner) != System.Windows.Forms.DialogResult.OK)
             return;
-        foreach (var path in picker.FileNames)
+        foreach (string path in picker.FileNames)
             await Add(path);
         await Refresh();
     });
 
     private sealed record FileDialogOwner(IntPtr Handle) : System.Windows.Forms.IWin32Window;
-    private async Task Refresh() => await Refresh(await CompositionBuilder.Build(project));
+    private async Task Refresh() => await Refresh(await CompositionBuilder.Build(_project));
 
     private Task Refresh(MediaComposition next)
     {
-        var nextStream = next.GeneratePreviewMediaStreamSource(project.Video.Width, project.Video.Height);
-        var nextSource = MediaSource.CreateFromMediaStreamSource(nextStream);
+        MediaStreamSource nextStream = next.GeneratePreviewMediaStreamSource(_project.Video.Width, _project.Video.Height);
+        MediaSource nextSource = MediaSource.CreateFromMediaStreamSource(nextStream);
         HideStill();
-        pendingSeek = Math.Clamp(playhead, 0, ProjectEnd);
-        resumePlayback = Preview.MediaPlayer.PlaybackSession.PlaybackState == Windows.Media.Playback.MediaPlaybackState.Playing;
-        previewOpening = true;
-        playbackError = null;
+        _pendingSeek = Math.Clamp(_playhead, 0, ProjectEnd);
+        _resumePlayback = Preview.MediaPlayer.PlaybackSession.PlaybackState == Windows.Media.Playback.MediaPlaybackState.Playing;
+        _previewOpening = true;
+        _playbackError = null;
         Preview.MediaPlayer.Source = nextSource;
-        source?.Dispose();
-        source = nextSource;
-        composition = next;
-        previewStream = nextStream;
-        UpdatePosition(pendingSeek);
+        _source?.Dispose();
+        _source = nextSource;
+        _composition = next;
+        _previewStream = nextStream;
+        UpdatePosition(_pendingSeek);
         Status.Text = "プレビューを更新しました";
         return Task.CompletedTask;
     }
@@ -219,19 +219,19 @@ public sealed partial class MainWindow : Window
     {
         await DeleteSelection(false);
     });
-    private async void Undo_Click(object sender, RoutedEventArgs e) => await Run(() => RestoreHistory(undo, redo));
-    private async void Redo_Click(object sender, RoutedEventArgs e) => await Run(() => RestoreHistory(redo, undo));
+    private async void Undo_Click(object sender, RoutedEventArgs e) => await Run(() => RestoreHistory(_undo, _redo));
+    private async void Redo_Click(object sender, RoutedEventArgs e) => await Run(() => RestoreHistory(_redo, _undo));
 
     private async Task RestoreHistory(Stack<EditProject> from, Stack<EditProject> to)
     {
-        if (from.TryPeek(out var previous))
+        if (from.TryPeek(out EditProject? previous))
         {
-            var prepared = await CompositionBuilder.Build(previous);
-            to.Push(project.Copy());
+            MediaComposition prepared = await CompositionBuilder.Build(previous);
+            to.Push(_project.Copy());
             from.Pop();
-            project = previous;
-            selectedIds.Clear();
-            selected = null;
+            _project = previous;
+            _selectedIds.Clear();
+            _selected = null;
             SelectedName.Text = "クリップ未選択";
             Draw();
             await Refresh(prepared);

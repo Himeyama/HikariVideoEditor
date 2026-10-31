@@ -12,30 +12,30 @@ namespace VideoEditor;
 public sealed class Bridge : IDisposable
 {
     public const int DefaultPort = 53100;
-    private static readonly string[] Versions = ["2025-11-25", "2025-06-18", "2025-03-26"];
-    private readonly WebApplication server;
-    private readonly Func<JsonElement, Task<object>> dispatch;
+    private static readonly string[] _versions = ["2025-11-25", "2025-06-18", "2025-03-26"];
+    private readonly WebApplication _server;
+    private readonly Func<JsonElement, Task<object>> _dispatch;
     public int Port { get; }
     public string Endpoint => $"http://127.0.0.1:{Port}/mcp";
 
     public Bridge(Func<JsonElement, Task<object>> dispatch)
     {
-        this.dispatch = dispatch;
+        this._dispatch = dispatch;
         for (int port = DefaultPort; port <= 65535; port++)
         {
-            var builder = WebApplication.CreateSlimBuilder();
+            WebApplicationBuilder builder = WebApplication.CreateSlimBuilder();
             builder.Logging.ClearProviders();
             builder.WebHost.ConfigureKestrel(options =>
             {
                 options.Listen(IPAddress.Loopback, port);
                 options.Limits.MaxRequestBodySize = 262144;
             });
-            var candidate = builder.Build();
+            WebApplication candidate = builder.Build();
             candidate.Run(Handle);
             try
             {
                 Task.Run(() => candidate.StartAsync()).GetAwaiter().GetResult();
-                server = candidate;
+                _server = candidate;
                 Port = port;
                 return;
             }
@@ -53,12 +53,12 @@ public sealed class Bridge : IDisposable
 
     private async Task Handle(HttpContext context)
     {
-        var request = context.Request;
+        HttpRequest request = context.Request;
         if (request.Path != "/mcp" && request.Path != "/docs") { context.Response.StatusCode = 404; return; }
         if (request.Host.Host != "127.0.0.1" && request.Host.Host != "localhost")
         { context.Response.StatusCode = 403; return; }
-        if (request.Headers.TryGetValue("Origin", out var origin) &&
-            (!Uri.TryCreate(origin.ToString(), UriKind.Absolute, out var uri) ||
+        if (request.Headers.TryGetValue("Origin", out Microsoft.Extensions.Primitives.StringValues origin) &&
+            (!Uri.TryCreate(origin.ToString(), UriKind.Absolute, out Uri? uri) ||
              uri.Scheme != "http" || (uri.Host != "127.0.0.1" && uri.Host != "localhost") || uri.Port != Port))
         { context.Response.StatusCode = 403; return; }
         if (request.Path == "/docs")
@@ -73,7 +73,7 @@ public sealed class Bridge : IDisposable
             await context.Response.WriteAsync(McpDocumentation.Create(Port));
             return;
         }
-        if (request.Headers.TryGetValue("MCP-Protocol-Version", out var version) && !Versions.Contains(version.ToString()))
+        if (request.Headers.TryGetValue("MCP-Protocol-Version", out Microsoft.Extensions.Primitives.StringValues version) && !_versions.Contains(version.ToString()))
         { context.Response.StatusCode = 400; return; }
         if (request.Method != "POST")
         {
@@ -82,7 +82,7 @@ public sealed class Bridge : IDisposable
             return;
         }
         if (!request.HasJsonContentType()) { context.Response.StatusCode = 415; return; }
-        var accept = request.GetTypedHeaders().Accept;
+        IList<Microsoft.Net.Http.Headers.MediaTypeHeaderValue> accept = request.GetTypedHeaders().Accept;
         if (accept == null || !accept.Any(value => value.MediaType == "application/json") ||
             !accept.Any(value => value.MediaType == "text/event-stream"))
         { context.Response.StatusCode = 406; return; }
@@ -90,16 +90,16 @@ public sealed class Bridge : IDisposable
         object response;
         try
         {
-            using var document = await JsonDocument.ParseAsync(request.Body, cancellationToken: context.RequestAborted);
-            var root = document.RootElement;
+            using JsonDocument document = await JsonDocument.ParseAsync(request.Body, cancellationToken: context.RequestAborted);
+            JsonElement root = document.RootElement;
             if (root.ValueKind != JsonValueKind.Object ||
-                !root.TryGetProperty("jsonrpc", out var rpc) || rpc.GetString() != "2.0" ||
-                !root.TryGetProperty("method", out var method) || method.ValueKind != JsonValueKind.String)
+                !root.TryGetProperty("jsonrpc", out JsonElement rpc) || rpc.GetString() != "2.0" ||
+                !root.TryGetProperty("method", out JsonElement method) || method.ValueKind != JsonValueKind.String)
             {
                 await WriteError(context, null, -32600, "Invalid Request");
                 return;
             }
-            if (!root.TryGetProperty("id", out var requestId))
+            if (!root.TryGetProperty("id", out JsonElement requestId))
             {
                 // Notifications never execute editor tools and have no JSON-RPC response.
                 context.Response.StatusCode = 202;
@@ -108,17 +108,17 @@ public sealed class Bridge : IDisposable
             if (requestId.ValueKind != JsonValueKind.String && requestId.ValueKind != JsonValueKind.Number)
             { await WriteError(context, null, -32600, "Invalid request id"); return; }
             id = requestId.Clone();
-            var parameters = root.TryGetProperty("params", out var p) ? p : default;
+            JsonElement parameters = root.TryGetProperty("params", out JsonElement p) ? p : default;
             object result;
             switch (method.GetString())
             {
                 case "initialize":
-                    var requested = parameters.GetProperty("protocolVersion").GetString();
+                    string? requested = parameters.GetProperty("protocolVersion").GetString();
                     _ = parameters.GetProperty("capabilities");
                     _ = parameters.GetProperty("clientInfo");
                     result = new
                     {
-                        protocolVersion = Versions.Contains(requested) ? requested : Versions[0],
+                        protocolVersion = _versions.Contains(requested) ? requested : _versions[0],
                         capabilities = new { tools = new { listChanged = false } },
                         serverInfo = new { name = "hikari-video-editor", version = "1.0.0" },
                         instructions = "Use project_get to inspect clips. After editing call preview_refresh. Times are seconds; layers start at 1. Paths refer to this Windows PC."
@@ -127,16 +127,16 @@ public sealed class Bridge : IDisposable
                 case "ping": result = new { }; break;
                 case "tools/list": result = new { tools = McpTools.All }; break;
                 case "tools/call":
-                    var name = parameters.GetProperty("name").GetString();
-                    var tool = McpTools.All.SingleOrDefault(tool => tool.name == name);
+                    string? name = parameters.GetProperty("name").GetString();
+                    McpTools.Tool? tool = McpTools.All.SingleOrDefault(tool => tool.name == name);
                     if (tool == null) { await WriteError(context, id, -32602, "Unknown tool"); return; }
-                    var arguments = parameters.TryGetProperty("arguments", out var a) ? a : JsonSerializer.SerializeToElement(new { });
+                    JsonElement arguments = parameters.TryGetProperty("arguments", out JsonElement a) ? a : JsonSerializer.SerializeToElement(new { });
                     if (!tool.ValidArguments(arguments))
                     { await WriteError(context, id, -32602, "Arguments do not match inputSchema"); return; }
                     try
                     {
-                        var command = JsonSerializer.SerializeToElement(new { method = tool.Method, @params = arguments });
-                        var value = await dispatch(command);
+                        JsonElement command = JsonSerializer.SerializeToElement(new { method = tool.Method, @params = arguments });
+                        object value = await _dispatch(command);
                         result = new { content = new[] { new { type = "text", text = JsonSerializer.Serialize(value) } }, isError = false };
                     }
                     catch (Exception exception)
@@ -166,9 +166,9 @@ public sealed class Bridge : IDisposable
 
     private async Task Stop()
     {
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(2));
-        try { await server.StopAsync(timeout.Token); }
+        using CancellationTokenSource timeout = new(TimeSpan.FromSeconds(2));
+        try { await _server.StopAsync(timeout.Token); }
         catch (OperationCanceledException) { }
-        finally { await server.DisposeAsync(); }
+        finally { await _server.DisposeAsync(); }
     }
 }

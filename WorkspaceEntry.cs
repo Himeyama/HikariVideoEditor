@@ -11,12 +11,12 @@ public sealed record WorkspaceEntry(string FullPath, bool IsDirectory)
 
     public static List<WorkspaceEntry> ReadDirectory(string directory, bool foldersOnly = false)
     {
-        var options = new EnumerationOptions
+        EnumerationOptions options = new()
         {
             IgnoreInaccessible = true
         };
-        var folders = Directory.EnumerateDirectories(directory, "*", options).Select(path => new WorkspaceEntry(path, true));
-        var files = foldersOnly ? Enumerable.Empty<WorkspaceEntry>() : Directory.EnumerateFiles(directory, "*", options).Select(path => new WorkspaceEntry(path, false));
+        IEnumerable<WorkspaceEntry> folders = Directory.EnumerateDirectories(directory, "*", options).Select(path => new WorkspaceEntry(path, true));
+        IEnumerable<WorkspaceEntry> files = foldersOnly ? Enumerable.Empty<WorkspaceEntry>() : Directory.EnumerateFiles(directory, "*", options).Select(path => new WorkspaceEntry(path, false));
         return folders.Concat(files).OrderByDescending(entry => entry.IsDirectory).ThenBy(entry => entry.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
     }
 }

@@ -5,16 +5,16 @@ public sealed partial class MainWindow
 {
     private Task<object> DispatchCommand(JsonElement request)
     {
-        var completion = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
-        if (closed || !DispatcherQueue.TryEnqueue(async () =>
+        TaskCompletionSource<object> completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        if (_closed || !DispatcherQueue.TryEnqueue(async () =>
         {
-            await gate.WaitAsync();
+            await _gate.WaitAsync();
             try
             {
-                if (closed)
+                if (_closed)
                     throw new InvalidOperationException("終了中です。");
-                var previous = ProjectSnapshot();
-                var result = await Command(request);
+                string previous = ProjectSnapshot();
+                object result = await Command(request);
                 await AutoSaveChanges(previous);
                 completion.SetResult(result);
             }
@@ -24,7 +24,7 @@ public sealed partial class MainWindow
             }
             finally
             {
-                gate.Release();
+                _gate.Release();
             }
         }))
             completion.TrySetException(new InvalidOperationException("アプリは終了しました。"));
@@ -34,7 +34,7 @@ public sealed partial class MainWindow
     private async Task<object> Command(JsonElement r)
     {
         string method = r.GetProperty("method").GetString()!;
-        var p = r.TryGetProperty("params", out var parameters) ? parameters : default;
+        JsonElement p = r.TryGetProperty("params", out JsonElement parameters) ? parameters : default;
         string Arg(string key) => p.GetProperty(key).GetString() ?? throw new ArgumentException(key);
         switch (method)
         {
@@ -45,7 +45,7 @@ public sealed partial class MainWindow
                     version = 1
                 };
             case "project.get":
-                return project.Copy();
+                return _project.Copy();
             case "speech.voices":
                 return await MediaGeneration.Voices();
             case "speech.create":
@@ -53,67 +53,67 @@ public sealed partial class MainWindow
             case "image.create":
                 return await GenerateMedia(p, false);
             case "clip.add":
-                var added = await Add(Arg("path"), p.TryGetProperty("atPlayhead", out var atPlayhead) && atPlayhead.GetBoolean() ? playhead : null);
+                EditClip added = await Add(Arg("path"), p.TryGetProperty("atPlayhead", out JsonElement atPlayhead) && atPlayhead.GetBoolean() ? _playhead : null);
                 return added;
             case "selection.get":
                 return new
                 {
-                    ids = selectedIds.ToArray(),
-                    primary = selected
+                    ids = _selectedIds.ToArray(),
+                    primary = _selected
                 };
             case "selection.set":
-                var ids = p.GetProperty("ids").EnumerateArray().Select(value => value.GetString()!).ToHashSet();
-                if (ids.Any(id => !project.Clips.Any(clip => clip.Id == id)))
+                HashSet<string> ids = p.GetProperty("ids").EnumerateArray().Select(value => value.GetString()!).ToHashSet();
+                if (ids.Any(id => !_project.Clips.Any(clip => clip.Id == id)))
                     throw new ArgumentException("素材IDがありません。");
-                selectedIds.Clear();
-                selectedIds.UnionWith(ids);
+                _selectedIds.Clear();
+                _selectedIds.UnionWith(ids);
                 UpdatePrimarySelection();
                 Draw();
                 return new
                 {
-                    ids = selectedIds.ToArray()
+                    ids = _selectedIds.ToArray()
                 };
             case "selection.move":
                 await MoveSelection(p.GetProperty("seconds").GetDouble(), p.GetProperty("layers").GetInt32());
                 return new
                 {
-                    ids = selectedIds.ToArray()
+                    ids = _selectedIds.ToArray()
                 };
             case "clip.update":
-                var next = project.Copy();
-                var clip = next.Clips.Single(c => c.Id == Arg("id"));
-                project.RequireEditable(clip.Layer);
-                if (p.TryGetProperty("start", out var start))
+                EditProject next = _project.Copy();
+                EditClip clip = next.Clips.Single(c => c.Id == Arg("id"));
+                _project.RequireEditable(clip.Layer);
+                if (p.TryGetProperty("start", out JsonElement start))
                     clip.Start = start.GetDouble();
-                if (p.TryGetProperty("trim", out var trim))
+                if (p.TryGetProperty("trim", out JsonElement trim))
                     clip.Trim = trim.GetDouble();
-                if (p.TryGetProperty("duration", out var duration))
+                if (p.TryGetProperty("duration", out JsonElement duration))
                     clip.Duration = duration.GetDouble();
-                if (p.TryGetProperty("layer", out var layer))
+                if (p.TryGetProperty("layer", out JsonElement layer))
                     clip.Layer = layer.GetInt32();
-                if (p.TryGetProperty("volume", out var volume))
+                if (p.TryGetProperty("volume", out JsonElement volume))
                     clip.Volume = volume.GetDouble();
-                if (p.TryGetProperty("fadeIn", out var fadeIn)) clip.FadeIn = fadeIn.GetDouble();
-                if (p.TryGetProperty("fadeOut", out var fadeOut)) clip.FadeOut = fadeOut.GetDouble();
-                project.RequireEditable(clip.Layer);
-                if (p.TryGetProperty("offsetX", out var offsetX))
+                if (p.TryGetProperty("fadeIn", out JsonElement fadeIn)) clip.FadeIn = fadeIn.GetDouble();
+                if (p.TryGetProperty("fadeOut", out JsonElement fadeOut)) clip.FadeOut = fadeOut.GetDouble();
+                _project.RequireEditable(clip.Layer);
+                if (p.TryGetProperty("offsetX", out JsonElement offsetX))
                     clip.OffsetX = offsetX.GetDouble();
-                if (p.TryGetProperty("offsetY", out var offsetY))
+                if (p.TryGetProperty("offsetY", out JsonElement offsetY))
                     clip.OffsetY = offsetY.GetDouble();
-                if (p.TryGetProperty("scale", out var scale))
+                if (p.TryGetProperty("scale", out JsonElement scale))
                     clip.Scale = scale.GetDouble();
                 await CompositionBuilder.Build(next);
                 Remember();
-                project = next;
+                _project = next;
                 Select(clip);
                 return clip;
             case "clip.duplicate":
                 return await DuplicateClip(Arg("id"));
             case "workspace.set":
-                var workspacePath = Path.GetFullPath(Arg("path"));
+                string workspacePath = Path.GetFullPath(Arg("path"));
                 await LoadWorkspaceDirectory(workspacePath);
                 Remember();
-                project.WorkspaceDirectory = workspacePath;
+                _project.WorkspaceDirectory = workspacePath;
                 UpdateGenerationAvailability();
                 UpdateStatusBar();
                 return new
@@ -121,24 +121,24 @@ public sealed partial class MainWindow
                     path = workspacePath
                 };
             case "clip.split":
-                return await Split(Arg("id"), p.TryGetProperty("seconds", out var splitTime) ? splitTime.GetDouble() : playhead);
+                return await Split(Arg("id"), p.TryGetProperty("seconds", out JsonElement splitTime) ? splitTime.GetDouble() : _playhead);
             case "playback.get":
                 return new
                 {
-                    seconds = playhead,
+                    seconds = _playhead,
                     duration = ProjectEnd,
                     state = Preview.MediaPlayer.PlaybackSession.PlaybackState.ToString(),
-                    opening = previewOpening,
+                    opening = _previewOpening,
                     hasSource = Preview.MediaPlayer.Source != null,
-                    error = playbackError
+                    error = _playbackError
                 };
             case "clip.delete":
-                var id = Arg("id");
-                if (!project.Clips.Any(c => c.Id == id))
+                string id = Arg("id");
+                if (!_project.Clips.Any(c => c.Id == id))
                     throw new ArgumentException("IDがありません。");
-                project.RequireEditable(project.Clips.Single(c => c.Id == id).Layer);
+                _project.RequireEditable(_project.Clips.Single(c => c.Id == id).Layer);
                 Remember();
-                project.Clips.RemoveAll(c => c.Id == id);
+                _project.Clips.RemoveAll(c => c.Id == id);
                 Draw();
                 return new
                 {
@@ -160,7 +160,7 @@ public sealed partial class MainWindow
                 Pause();
                 break;
             case "playback.seek":
-                var seconds = p.GetProperty("seconds").GetDouble();
+                double seconds = p.GetProperty("seconds").GetDouble();
                 if (!double.IsFinite(seconds) || seconds < 0 || seconds > 86400)
                     throw new ArgumentException("シーク位置が不正です。");
                 Seek(seconds);

@@ -7,15 +7,15 @@ namespace VideoEditor;
 
 public sealed partial class MainWindow
 {
-    private CancellationTokenSource? downloadCancellation;
+    private CancellationTokenSource? _downloadCancellation;
 
     private async void DownloadVideo_Click(object sender, RoutedEventArgs e) => await Run(async () =>
     {
-        using var cancellation = new CancellationTokenSource();
-        downloadCancellation = cancellation;
-        var cookies = new System.Net.CookieContainer();
+        using CancellationTokenSource cancellation = new();
+        _downloadCancellation = cancellation;
+        System.Net.CookieContainer cookies = new();
         // Redirects are deliberately disabled: only validated media hosts may receive requests.
-        using var http = new HttpClient(new HttpClientHandler
+        using HttpClient http = new(new HttpClientHandler
         {
             AllowAutoRedirect = false,
             CookieContainer = cookies,
@@ -27,14 +27,14 @@ public sealed partial class MainWindow
         }
         catch (OperationCanceledException)
         {
-            if (!closed) Status.Text = "動画のダウンロードをキャンセルしました。";
+            if (!_closed) Status.Text = "動画のダウンロードをキャンセルしました。";
         }
         catch (Exception exception)
         {
-            if (!closed)
+            if (!_closed)
             {
                 Status.Text = "動画のダウンロードに失敗しました。";
-                var error = new ContentDialog
+                ContentDialog error = new()
                 {
                     XamlRoot = Root.XamlRoot, Title = "動画をダウンロードできませんでした",
                     Content = DownloadError(exception), CloseButtonText = "閉じる"
@@ -44,27 +44,27 @@ public sealed partial class MainWindow
         }
         finally
         {
-            downloadCancellation = null;
+            _downloadCancellation = null;
         }
     });
 
     private async Task ShowVideoDownloadAsync(HttpClient http, System.Net.CookieContainer cookies, CancellationTokenSource cancellation)
     {
-        var token = cancellation.Token;
-        var input = new TextBox { Header = "動画の URL", PlaceholderText = "https://…", HorizontalAlignment = HorizontalAlignment.Stretch };
-        var fetch = new Button { Content = "動画情報を取得" };
-        var details = new TextBlock { TextWrapping = TextWrapping.Wrap, IsTextSelectionEnabled = true };
-        var quality = new ComboBox { Header = "画質", HorizontalAlignment = HorizontalAlignment.Stretch, IsEnabled = false };
-        var add = new CheckBox { Content = "完了後にタイムラインへ追加", IsChecked = false };
-        var error = new TextBlock { TextWrapping = TextWrapping.Wrap, IsTextSelectionEnabled = true };
-        var workspaceDirectory = workspaceCurrentDirectory ?? project.WorkspaceDirectory;
+        CancellationToken token = cancellation.Token;
+        TextBox input = new() { Header = "動画の URL", PlaceholderText = "https://…", HorizontalAlignment = HorizontalAlignment.Stretch };
+        Button fetch = new() { Content = "動画情報を取得" };
+        TextBlock details = new() { TextWrapping = TextWrapping.Wrap, IsTextSelectionEnabled = true };
+        ComboBox quality = new() { Header = "画質", HorizontalAlignment = HorizontalAlignment.Stretch, IsEnabled = false };
+        CheckBox add = new() { Content = "完了後にタイムラインへ追加", IsChecked = false };
+        TextBlock error = new() { TextWrapping = TextWrapping.Wrap, IsTextSelectionEnabled = true };
+        string? workspaceDirectory = _workspaceCurrentDirectory ?? _project.WorkspaceDirectory;
         bool hasWorkspace = !string.IsNullOrWhiteSpace(workspaceDirectory) && Directory.Exists(workspaceDirectory);
-        var workspaceHint = new TextBlock
+        TextBlock workspaceHint = new()
         {
             Text = hasWorkspace ? $"ワークスペースの保存先: {workspaceDirectory}" : "ワークスペースを選択すると、直接ダウンロードできます。",
             TextWrapping = TextWrapping.Wrap, IsTextSelectionEnabled = true
         };
-        var panel = new StackPanel { Spacing = 16, MinWidth = 360, MaxWidth = 520 };
+        StackPanel panel = new() { Spacing = 16, MinWidth = 360, MaxWidth = 520 };
         panel.Children.Add(input);
         panel.Children.Add(fetch);
         panel.Children.Add(details);
@@ -72,7 +72,7 @@ public sealed partial class MainWindow
         panel.Children.Add(add);
         panel.Children.Add(workspaceHint);
         panel.Children.Add(error);
-        var dialog = new ContentDialog
+        ContentDialog dialog = new()
         {
             XamlRoot = Root.XamlRoot, Title = "動画をダウンロード",
             Content = new ScrollViewer { Content = panel, MaxHeight = Math.Max(200, AppHost.ActualHeight - 240) },
@@ -114,17 +114,17 @@ public sealed partial class MainWindow
             details.Text = "動画情報を取得中…";
             try
             {
-                using var timeout = CancellationTokenSource.CreateLinkedTokenSource(token);
+                using CancellationTokenSource timeout = CancellationTokenSource.CreateLinkedTokenSource(token);
                 timeout.CancelAfter(TimeSpan.FromSeconds(120));
-                var progress = new Progress<DownloadProgress>(value =>
+                Progress<DownloadProgress> progress = new(value =>
                 {
-                    if (resolving && !closed && !token.IsCancellationRequested) details.Text = value.Stage;
+                    if (resolving && !_closed && !token.IsCancellationRequested) details.Text = value.Stage;
                 });
                 // Validate before starting either network or browser work.
                 _ = VideoDownloadSource.ParseId(input.Text);
                 try
                 {
-                    using var directTimeout = CancellationTokenSource.CreateLinkedTokenSource(timeout.Token);
+                    using CancellationTokenSource directTimeout = CancellationTokenSource.CreateLinkedTokenSource(timeout.Token);
                     directTimeout.CancelAfter(TimeSpan.FromSeconds(40));
                     video = await new VideoDownloadSource(http).ResolveAsync(input.Text, directTimeout.Token, progress);
                 }
@@ -134,7 +134,7 @@ public sealed partial class MainWindow
                     video = await ResolveInAnonymousBrowserAsync(input.Text, http, cookies, timeout.Token, progress);
                 }
                 details.Text = $"{video.Title}\n長さ: {video.Duration:hh\\:mm\\:ss}";
-                foreach (var format in video.Formats) quality.Items.Add(format);
+                foreach (DownloadStream format in video.Formats) quality.Items.Add(format);
                 quality.SelectedIndex = Math.Max(0, video.Formats.ToList().FindIndex(f => f.Height <= 1080));
                 quality.IsEnabled = true;
                 dialog.IsPrimaryButtonEnabled = true;
@@ -154,10 +154,10 @@ public sealed partial class MainWindow
             {
                 resolving = false;
                 input.IsEnabled = fetch.IsEnabled = true;
-                if (closing || closed) dialog.Hide();
+                if (closing || _closed) dialog.Hide();
             }
         };
-        var choice = await dialog.ShowAsync();
+        ContentDialogResult choice = await dialog.ShowAsync();
         if (choice is not (ContentDialogResult.Primary or ContentDialogResult.Secondary) || video == null || quality.SelectedItem is not DownloadStream formatChoice)
             return;
         token.ThrowIfCancellationRequested();
@@ -170,21 +170,21 @@ public sealed partial class MainWindow
         }
         else
         {
-            var picker = new FileSavePicker { SuggestedFileName = VideoDownloadDestination.FileName(video.Title), DefaultFileExtension = ".mp4" };
+            FileSavePicker picker = new() { SuggestedFileName = VideoDownloadDestination.FileName(video.Title), DefaultFileExtension = ".mp4" };
             picker.FileTypeChoices.Add("MP4 動画", new[] { ".mp4" });
             InitPicker(picker);
-            var destination = await picker.PickSaveFileAsync();
+            Windows.Storage.StorageFile destination = await picker.PickSaveFileAsync();
             if (destination == null) return;
             destinationPath = destination.Path;
         }
-        if (project.Clips.Any(c => c.Kind != "subtitle" && string.Equals(Path.GetFullPath(c.Path), destinationPath, StringComparison.OrdinalIgnoreCase)))
+        if (_project.Clips.Any(c => c.Kind != "subtitle" && string.Equals(Path.GetFullPath(c.Path), destinationPath, StringComparison.OrdinalIgnoreCase)))
             throw new ArgumentException("使用中の素材には上書きできません。別の保存先を選んでください。");
-        var label = new TextBlock { Text = "ダウンロードを準備中…", TextWrapping = TextWrapping.Wrap };
-        var bar = new ProgressBar { IsIndeterminate = true, Minimum = 0, Maximum = 100 };
-        var content = new StackPanel { Spacing = 16, MinWidth = 360 };
+        TextBlock label = new() { Text = "ダウンロードを準備中…", TextWrapping = TextWrapping.Wrap };
+        ProgressBar bar = new() { IsIndeterminate = true, Minimum = 0, Maximum = 100 };
+        StackPanel content = new() { Spacing = 16, MinWidth = 360 };
         content.Children.Add(label);
         content.Children.Add(bar);
-        var progressDialog = new ContentDialog
+        ContentDialog progressDialog = new()
         {
             XamlRoot = Root.XamlRoot, Title = "動画をダウンロード中", Content = content, CloseButtonText = "キャンセル"
         };
@@ -197,10 +197,10 @@ public sealed partial class MainWindow
             label.Text = "キャンセル中…";
             progressDialog.IsEnabled = false;
         };
-        var showing = progressDialog.ShowAsync();
-        var progress = new Progress<DownloadProgress>(value =>
+        Windows.Foundation.IAsyncOperation<ContentDialogResult> showing = progressDialog.ShowAsync();
+        Progress<DownloadProgress> progress = new(value =>
         {
-            if (finished || closed || token.IsCancellationRequested) return;
+            if (finished || _closed || token.IsCancellationRequested) return;
             bar.IsIndeterminate = !value.Percent.HasValue;
             bar.Value = value.Percent ?? 0;
             label.Text = value.Percent.HasValue ? $"{value.Stage}: {value.Percent:F0}%" : value.Stage;
@@ -215,14 +215,14 @@ public sealed partial class MainWindow
             progressDialog.Hide();
             await showing;
         }
-        if (closed) return;
+        if (_closed) return;
         // Saving is already complete. An import failure must not be reported as a transfer failure.
         try
         {
-            if (workspaceCurrentDirectory != null) await LoadWorkspaceDirectory(workspaceCurrentDirectory);
+            if (_workspaceCurrentDirectory != null) await LoadWorkspaceDirectory(_workspaceCurrentDirectory);
             if (add.IsChecked == true)
             {
-                await Add(destinationPath, playhead);
+                await Add(destinationPath, _playhead);
                 await Refresh();
             }
             Status.Text = $"ダウンロード完了: {destinationPath}";

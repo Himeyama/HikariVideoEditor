@@ -3,23 +3,23 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 string directory = Path.GetFullPath(args[0]);
-var files = Directory.GetFiles(directory, "*.cs");
+string[] files = Directory.GetFiles(directory, "*.cs");
 foreach (string file in files)
 {
-    var source = CSharpSyntaxTree.ParseText(File.ReadAllText(file));
+    SyntaxTree source = CSharpSyntaxTree.ParseText(File.ReadAllText(file));
     if (source.GetDiagnostics().Any(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error))
         throw new InvalidOperationException($"Invalid C# source: {file}");
 
     string formatted = source.GetRoot().NormalizeWhitespace(indentation: "    ", eol: Environment.NewLine).ToFullString();
-    var normalized = CSharpSyntaxTree.ParseText(formatted);
-    var initializers = normalized.GetRoot().DescendantNodes()
+    SyntaxTree normalized = CSharpSyntaxTree.ParseText(formatted);
+    IOrderedEnumerable<InitializerExpressionSyntax> initializers = normalized.GetRoot().DescendantNodes()
         .OfType<InitializerExpressionSyntax>()
         .Where(initializer => initializer.IsKind(SyntaxKind.ObjectInitializerExpression)
             && initializer.Expressions.Count > 1
             && !initializer.DescendantNodes().OfType<InitializerExpressionSyntax>().Any())
         .OrderByDescending(initializer => initializer.SpanStart);
 
-    foreach (var initializer in initializers)
+    foreach (InitializerExpressionSyntax initializer in initializers)
     {
         int lineStart = formatted.LastIndexOf('\n', initializer.SpanStart) + 1;
         int indentation = formatted.Skip(lineStart).TakeWhile(character => character == ' ').Count();

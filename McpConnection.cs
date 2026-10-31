@@ -8,14 +8,14 @@ public sealed partial class MainWindow
 {
     private async void McpConnection_Click(object sender, RoutedEventArgs e)
     {
-        var prompt = $"""
+        string prompt = $"""
             Hikari Video Editor は、画像・動画・音声をタイムライン上に配置し、カット、複製、位置・大きさ・音量の調整、プレビュー再生、MP4出力ができるWindows用の動画編集アプリです。このPCで起動中のアプリを操作してください。
 
-            ポート番号: {bridge.Port}
-            仕様・リクエスト方法・使用法の取得先: http://127.0.0.1:{bridge.Port}/docs
+            ポート番号: {_bridge.Port}
+            仕様・リクエスト方法・使用法の取得先: http://127.0.0.1:{_bridge.Port}/docs
             HTTPメソッド: GET（本文なし）。最初にこのURLを取得し、接続手順とツールの仕様を確認してください。
 
-            操作リクエストの送信先: {bridge.Endpoint}
+            操作リクエストの送信先: {_bridge.Endpoint}
             HTTPメソッド: POST
             通信方式: MCP Streamable HTTP（JSON-RPC 2.0）。MCP対応クライアントにはこの送信先URLを登録してください。
             Content-Type: application/json
@@ -27,12 +27,12 @@ public sealed partial class MainWindow
             編集の依頼:
             （ここに依頼内容を追記してください）
             """;
-        var text = new TextBlock
+        TextBlock text = new()
         {
             Text = prompt, IsTextSelectionEnabled = true,
             TextWrapping = TextWrapping.Wrap
         };
-        var dialog = new ContentDialog
+        ContentDialog dialog = new()
         {
             XamlRoot = Root.XamlRoot, Title = "生成AIへの接続",
             Content = new ScrollViewer
@@ -46,7 +46,7 @@ public sealed partial class MainWindow
         dialog.PrimaryButtonClick += (_, args) =>
         {
             args.Cancel = true;
-            var data = new DataPackage();
+            DataPackage data = new();
             data.SetText(prompt);
             Clipboard.SetContent(data);
             dialog.PrimaryButtonText = "コピーしました";

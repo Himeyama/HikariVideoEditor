@@ -8,7 +8,7 @@ public sealed class EditProject
     public VideoSettings Video { get; set; } = new();
     public List<EditClip> Clips { get; set; } = [];
     public Dictionary<int, LayerSettings> Layers { get; set; } = [];
-    public LayerSettings Layer(int number) => Layers.TryGetValue(number, out var settings) ? settings : new();
+    public LayerSettings Layer(int number) => Layers.TryGetValue(number, out LayerSettings? settings) ? settings : new();
     public void RequireEditable(params int[] layers)
     {
         if (layers.Any(number => Layer(number).Locked))
@@ -27,7 +27,7 @@ public sealed class EditProject
             throw new ArgumentException("レイヤー設定が不正です。");
         if (Clips.Select(c => c.Id).Distinct().Count() != Clips.Count)
             throw new ArgumentException("クリップIDが重複しています。");
-        foreach (var c in Clips)
+        foreach (EditClip c in Clips)
             c.Validate(Video.FrameRate);
     }
 }

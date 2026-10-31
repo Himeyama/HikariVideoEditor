@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace VideoEditor;
@@ -11,38 +11,38 @@ public static class McpTools
         public string description { get; }
         public object inputSchema { get; }
         [JsonIgnore] public string Method { get; }
-        private readonly Dictionary<string, string> properties;
-        private readonly string[] required;
+        private readonly Dictionary<string, string> _properties;
+        private readonly string[] _required;
 
         public Tool(string method, string description, string fields = "", string required = "")
         {
             Method = method;
             name = method.Replace('.', '_');
             this.description = description;
-            properties = fields.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+            _properties = fields.Split(' ', StringSplitOptions.RemoveEmptyEntries)
                 .Select(field => field.Split(':')).ToDictionary(pair => pair[0], pair => pair[1]);
-            this.required = required.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            this._required = required.Split(' ', StringSplitOptions.RemoveEmptyEntries);
             inputSchema = new
             {
                 type = "object",
-                properties = properties.ToDictionary(pair => pair.Key, pair => pair.Value == "array"
+                properties = _properties.ToDictionary(pair => pair.Key, pair => pair.Value == "array"
                     ? (object)new { type = "array", items = new { type = "string" } }
                     : new { type = pair.Value }),
-                required = this.required,
+                required = this._required,
                 additionalProperties = false
             };
         }
 
         public bool ValidArguments(JsonElement arguments)
         {
-            if (arguments.ValueKind != JsonValueKind.Object || required.Any(key => !arguments.TryGetProperty(key, out _))) return false;
-            foreach (var property in arguments.EnumerateObject())
+            if (arguments.ValueKind != JsonValueKind.Object || _required.Any(key => !arguments.TryGetProperty(key, out _))) return false;
+            foreach (JsonProperty property in arguments.EnumerateObject())
             {
-                if (!properties.TryGetValue(property.Name, out var type)) return false;
+                if (!_properties.TryGetValue(property.Name, out string? type)) return false;
                 bool valid = type switch
                 {
                     "string" => property.Value.ValueKind == JsonValueKind.String,
-                    "number" => property.Value.ValueKind == JsonValueKind.Number && property.Value.TryGetDouble(out var number) && double.IsFinite(number),
+                    "number" => property.Value.ValueKind == JsonValueKind.Number && property.Value.TryGetDouble(out double number) && double.IsFinite(number),
                     "integer" => property.Value.TryGetInt32(out _),
                     "boolean" => property.Value.ValueKind is JsonValueKind.True or JsonValueKind.False,
                     "array" => property.Value.ValueKind == JsonValueKind.Array && property.Value.EnumerateArray().All(item => item.ValueKind == JsonValueKind.String),

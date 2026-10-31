@@ -13,25 +13,25 @@ using Windows.UI;
 namespace VideoEditor;
 public sealed partial class MainWindow
 {
-    private double PixelsPerSecond = 48; // DIPs, never physical pixels.
-    private readonly Canvas timelineRuler = new() { IsHitTestVisible = false };
+    private double _pixelsPerSecond = 48; // DIPs, never physical pixels.
+    private readonly Canvas _timelineRuler = new() { IsHitTestVisible = false };
     private const double TrackLeft = 152;
     private const double RulerHeight = 32;
     private const double TrackHeight = 40;
-    private readonly DispatcherTimer playbackTimer = new()
+    private readonly DispatcherTimer _playbackTimer = new()
     {
         Interval = TimeSpan.FromMilliseconds(33)
     };
-    private Border? playheadLine;
-    private double playhead, pendingSeek;
-    private bool settingSlider, previewOpening, resumePlayback;
-    private string? playbackError;
-    private bool playbackIntent;
-    private uint? scrubPointer;
-    private bool resumeAfterScrub;
-    private double ProjectEnd => project.Clips.Select(c => c.Start + c.Duration).DefaultIfEmpty(0).Max();
+    private Border? _playheadLine;
+    private double _playhead, _pendingSeek;
+    private bool _settingSlider, _previewOpening, _resumePlayback;
+    private string? _playbackError;
+    private bool _playbackIntent;
+    private uint? _scrubPointer;
+    private bool _resumeAfterScrub;
+    private double ProjectEnd => _project.Clips.Select(c => c.Start + c.Duration).DefaultIfEmpty(0).Max();
 
-    private DragState? drag;
+    private DragState? _drag;
     private sealed class DragState
     {
         public required Grid View;
@@ -50,7 +50,7 @@ public sealed partial class MainWindow
         Timeline.AddHandler(UIElement.PointerWheelChangedEvent, new PointerEventHandler(Timeline_PointerWheelChanged), true);
         TimelineScroll.AddHandler(UIElement.PointerWheelChangedEvent, new PointerEventHandler(Timeline_PointerWheelChanged), true);
         TimelineScroll.ViewChanged += (_, _) => DrawTimelineRuler();
-        var player = new MediaPlayer
+        MediaPlayer player = new()
         {
             AutoPlay = false
         };
@@ -58,65 +58,65 @@ public sealed partial class MainWindow
         Preview.SetMediaPlayer(player);
         player.MediaOpened += (_, _) => DispatcherQueue.TryEnqueue(() =>
         {
-            if (closed)
+            if (_closed)
                 return;
-            previewOpening = false;
-            Seek(pendingSeek);
-            if (resumePlayback)
+            _previewOpening = false;
+            Seek(_pendingSeek);
+            if (_resumePlayback)
                 Play();
         });
         player.MediaFailed += (_, e) => DispatcherQueue.TryEnqueue(() =>
         {
-            previewOpening = false;
-            playbackIntent = false;
-            playbackError = e.ErrorMessage;
-            resumePlayback = false;
+            _previewOpening = false;
+            _playbackIntent = false;
+            _playbackError = e.ErrorMessage;
+            _resumePlayback = false;
             Status.Text = $"プレビューを再生できません: {e.ErrorMessage}";
         });
         player.MediaEnded += (_, _) => DispatcherQueue.TryEnqueue(() =>
         {
-            if (closed)
+            if (_closed)
                 return;
-            playbackIntent = false;
-            resumePlayback = false;
+            _playbackIntent = false;
+            _resumePlayback = false;
             UpdatePosition(ProjectEnd);
             RequestStill();
         });
-        playbackTimer.Tick += (_, _) =>
+        _playbackTimer.Tick += (_, _) =>
         {
-            if (scrubPointer == null && !previewOpening && player.Source != null && (player.PlaybackSession.PlaybackState == MediaPlaybackState.Playing || (!stillWorker && PausedPreview.Visibility != Visibility.Visible)))
+            if (_scrubPointer == null && !_previewOpening && player.Source != null && (player.PlaybackSession.PlaybackState == MediaPlaybackState.Playing || (!_stillWorker && PausedPreview.Visibility != Visibility.Visible)))
                 UpdatePosition(player.PlaybackSession.Position.TotalSeconds);
             PlayIcon.Glyph = player.PlaybackSession.PlaybackState == MediaPlaybackState.Playing ? "\uE769" : "\uE768";
         };
-        playbackTimer.Start();
+        _playbackTimer.Start();
     }
 
     private string TimeLabel(double seconds)
     {
-        var frames = (long)Math.Round(Math.Max(0, seconds) * project.Video.FrameRate);
-        var rate = project.Video.FrameRate;
+        long frames = (long)Math.Round(Math.Max(0, seconds) * _project.Video.FrameRate);
+        int rate = _project.Video.FrameRate;
         return $"{frames / (3600 * rate):00}:{frames / (60 * rate) % 60:00}:{frames / rate % 60:00}.{frames % rate:00}";
     }
 
     private void UpdatePosition(double seconds)
     {
-        playhead = Math.Clamp(seconds, 0, Math.Max(0, ProjectEnd));
-        settingSlider = true;
+        _playhead = Math.Clamp(seconds, 0, Math.Max(0, ProjectEnd));
+        _settingSlider = true;
         PositionSlider.Maximum = Math.Max(ClipEditing.MinimumDuration, ProjectEnd);
-        PositionSlider.Value = playhead;
-        settingSlider = false;
-        PositionText.Text = TimeLabel(playhead);
+        PositionSlider.Value = _playhead;
+        _settingSlider = false;
+        PositionText.Text = TimeLabel(_playhead);
         UpdateStatusBar();
-        if (playheadLine != null)
-            Canvas.SetLeft(playheadLine, TrackLeft + playhead * PixelsPerSecond - 4);
+        if (_playheadLine != null)
+            Canvas.SetLeft(_playheadLine, TrackLeft + _playhead * _pixelsPerSecond - 4);
     }
 
     private void Seek(double seconds)
     {
         UpdatePosition(seconds);
-        pendingSeek = playhead;
-        if (!previewOpening && Preview.MediaPlayer.Source != null)
-            Preview.MediaPlayer.PlaybackSession.Position = TimeSpan.FromSeconds(playhead);
+        _pendingSeek = _playhead;
+        if (!_previewOpening && Preview.MediaPlayer.Source != null)
+            Preview.MediaPlayer.PlaybackSession.Position = TimeSpan.FromSeconds(_playhead);
         RequestStill();
     }
 
@@ -124,12 +124,12 @@ public sealed partial class MainWindow
     {
         if (Preview.MediaPlayer.Source == null)
             return;
-        playbackIntent = true;
-        if (previewOpening)
-            resumePlayback = true;
+        _playbackIntent = true;
+        if (_previewOpening)
+            _resumePlayback = true;
         else
         {
-            if (playhead >= ProjectEnd - 1.0 / project.Video.FrameRate)
+            if (_playhead >= ProjectEnd - 1.0 / _project.Video.FrameRate)
                 Seek(0);
             HideStill();
             Preview.MediaPlayer.Play();
@@ -138,15 +138,15 @@ public sealed partial class MainWindow
 
     private void Pause()
     {
-        playbackIntent = false;
-        resumePlayback = false;
+        _playbackIntent = false;
+        _resumePlayback = false;
         Preview.MediaPlayer.Pause();
         RequestStill();
     }
 
     private void PositionSlider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
     {
-        if (!settingSlider && Preview?.MediaPlayer != null)
+        if (!_settingSlider && Preview?.MediaPlayer != null)
             Seek(e.NewValue);
     }
 
@@ -157,7 +157,7 @@ public sealed partial class MainWindow
 
     private void TogglePlayback()
     {
-        if (Preview.MediaPlayer.PlaybackSession.PlaybackState == MediaPlaybackState.Playing || (previewOpening && resumePlayback))
+        if (Preview.MediaPlayer.PlaybackSession.PlaybackState == MediaPlaybackState.Playing || (_previewOpening && _resumePlayback))
             Pause();
         else
             Play();
@@ -168,7 +168,7 @@ public sealed partial class MainWindow
         if (e.Key is Windows.System.VirtualKey.Delete or Windows.System.VirtualKey.F2)
         {
             bool workspaceFocused = false;
-            for (var current = FocusManager.GetFocusedElement(Root.XamlRoot) as DependencyObject;
+            for (DependencyObject? current = FocusManager.GetFocusedElement(Root.XamlRoot) as DependencyObject;
                  current != null; current = VisualTreeHelper.GetParent(current))
             {
                 if (current is TextBox or RichEditBox or PasswordBox or NumberBox or ContentDialog)
@@ -179,26 +179,26 @@ public sealed partial class MainWindow
             {
                 if (WorkspaceFiles.SelectedNode?.Content is not FrameworkElement { Tag: WorkspaceEntry entry }) return;
                 e.Handled = true;
-                if (!e.KeyStatus.WasKeyDown && gate.CurrentCount > 0)
+                if (!e.KeyStatus.WasKeyDown && _gate.CurrentCount > 0)
                     await Run(() => e.Key == Windows.System.VirtualKey.Delete ? DeleteWorkspaceEntry(entry) : RenameWorkspaceEntry(entry));
             }
-            else if (e.Key == Windows.System.VirtualKey.Delete && (selected != null || selectedIds.Count > 0))
+            else if (e.Key == Windows.System.VirtualKey.Delete && (_selected != null || _selectedIds.Count > 0))
             {
                 e.Handled = true;
-                if (!e.KeyStatus.WasKeyDown && gate.CurrentCount > 0)
+                if (!e.KeyStatus.WasKeyDown && _gate.CurrentCount > 0)
                     await Run(() => DeleteSelection(false));
             }
             return;
         }
         if (ControlPressed && e.Key is Windows.System.VirtualKey.Z or Windows.System.VirtualKey.Y)
         {
-            var historyFocus = FocusManager.GetFocusedElement(Root.XamlRoot) as DependencyObject;
-            for (var current = historyFocus; current != null; current = VisualTreeHelper.GetParent(current))
+            DependencyObject? historyFocus = FocusManager.GetFocusedElement(Root.XamlRoot) as DependencyObject;
+            for (DependencyObject? current = historyFocus; current != null; current = VisualTreeHelper.GetParent(current))
                 if (current is TextBox or RichEditBox or PasswordBox or NumberBox)
                     return;
             e.Handled = true;
             if (!e.KeyStatus.WasKeyDown)
-                await Run(() => e.Key == Windows.System.VirtualKey.Z ? RestoreHistory(undo, redo) : RestoreHistory(redo, undo));
+                await Run(() => e.Key == Windows.System.VirtualKey.Z ? RestoreHistory(_undo, _redo) : RestoreHistory(_redo, _undo));
             return;
         }
         if (!IsTransportKey(e.Key))
@@ -234,7 +234,7 @@ public sealed partial class MainWindow
     private void StepFrame(int direction)
     {
         Pause();
-        Seek(ClipEditing.Snap(playhead) + direction / (double)project.Video.FrameRate);
+        Seek(ClipEditing.Snap(_playhead) + direction / (double)_project.Video.FrameRate);
     }
 
     private void PreviousFrame_Click(object sender, RoutedEventArgs e) => StepFrame(-1);
@@ -243,52 +243,52 @@ public sealed partial class MainWindow
     {
         if (e.Handled || !ControlPressed)
             return;
-        var point = e.GetCurrentPoint(TimelineScroll);
+        Microsoft.UI.Input.PointerPoint point = e.GetCurrentPoint(TimelineScroll);
         if (point.Properties.IsHorizontalMouseWheel)
             return;
         e.Handled = true;
-        if (drag != null || marquee != null || scrubPointer != null || gate.CurrentCount == 0)
+        if (_drag != null || _marquee != null || _scrubPointer != null || _gate.CurrentCount == 0)
             return;
 
-        double next = Math.Clamp(PixelsPerSecond * Math.Pow(1.2, point.Properties.MouseWheelDelta / 120.0), 3, 1536);
-        if (next == PixelsPerSecond)
+        double next = Math.Clamp(_pixelsPerSecond * Math.Pow(1.2, point.Properties.MouseWheelDelta / 120.0), 3, 1536);
+        if (next == _pixelsPerSecond)
             return;
         // Keep the time beneath the pointer in the same place while zooming.
-        double time = Math.Max(0, (TimelineScroll.HorizontalOffset + point.Position.X - TrackLeft) / PixelsPerSecond);
-        PixelsPerSecond = next;
+        double time = Math.Max(0, (TimelineScroll.HorizontalOffset + point.Position.X - TrackLeft) / _pixelsPerSecond);
+        _pixelsPerSecond = next;
         DrawTimeline();
         TimelineScroll.UpdateLayout();
-        TimelineScroll.ChangeView(Math.Max(0, TrackLeft + time * PixelsPerSecond - point.Position.X), null, null, true);
+        TimelineScroll.ChangeView(Math.Max(0, TrackLeft + time * _pixelsPerSecond - point.Position.X), null, null, true);
         DrawTimelineRuler();
     }
 
     private void DrawTimelineRuler()
     {
-        timelineRuler.Children.Clear();
-        double desired = 120 / PixelsPerSecond;
+        _timelineRuler.Children.Clear();
+        double desired = 120 / _pixelsPerSecond;
         double magnitude = Math.Pow(10, Math.Floor(Math.Log10(desired)));
         double major = new[] { 1.0, 2, 5, 10 }.First(value => value * magnitude >= desired) * magnitude;
         double step = major / 5;
-        double left = Math.Max(0, (TimelineScroll.HorizontalOffset - TrackLeft) / PixelsPerSecond);
-        double right = Math.Max(left, (TimelineScroll.HorizontalOffset + TimelineScroll.ViewportWidth - TrackLeft) / PixelsPerSecond);
+        double left = Math.Max(0, (TimelineScroll.HorizontalOffset - TrackLeft) / _pixelsPerSecond);
+        double right = Math.Max(left, (TimelineScroll.HorizontalOffset + TimelineScroll.ViewportWidth - TrackLeft) / _pixelsPerSecond);
         long first = Math.Max(0, (long)Math.Floor(left / step) - 5);
         long last = (long)Math.Ceiling(right / step);
         for (long index = first; index <= last; index++)
         {
             bool labeled = index % 5 == 0;
-            double x = TrackLeft + index * step * PixelsPerSecond;
-            var tick = new Rectangle
+            double x = TrackLeft + index * step * _pixelsPerSecond;
+            Rectangle tick = new()
             {
                 Width = 1, Height = labeled ? 16 : 8,
                 Fill = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"]
             };
             Canvas.SetLeft(tick, x);
             Canvas.SetTop(tick, labeled ? 16 : 24);
-            timelineRuler.Children.Add(tick);
+            _timelineRuler.Children.Add(tick);
             if (!labeled) continue;
-            var label = new TextBlock { Text = TimeLabel(index * step), FontSize = 12 };
+            TextBlock label = new() { Text = TimeLabel(index * step), FontSize = 12 };
             Canvas.SetLeft(label, x + 8);
-            timelineRuler.Children.Add(label);
+            _timelineRuler.Children.Add(label);
         }
     }
 
@@ -296,30 +296,30 @@ public sealed partial class MainWindow
     {
         DispatcherQueue.TryEnqueue(() =>
         {
-            if (!closed && drag == null && marquee == null && scrubPointer == null)
+            if (!_closed && _drag == null && _marquee == null && _scrubPointer == null)
                 DrawTimeline();
         });
     }
 
     private void DrawTimeline()
     {
-        displayingObjectValues = true;
+        _displayingObjectValues = true;
         try
         {
-            LayerInput.Maximum = Math.Min(2000, project.LayerCount);
-            DurationInput.Minimum = 1.0 / project.Video.FrameRate;
-            PositionSlider.StepFrequency = 1.0 / project.Video.FrameRate;
+            LayerInput.Maximum = Math.Min(2000, _project.LayerCount);
+            DurationInput.Minimum = 1.0 / _project.Video.FrameRate;
+            PositionSlider.StepFrequency = 1.0 / _project.Video.FrameRate;
         }
-        finally { displayingObjectValues = false; }
+        finally { _displayingObjectValues = false; }
         Timeline.Children.Clear();
-        Timeline.Width = Math.Max((TimelineScroll.ViewportWidth > 0 ? TimelineScroll.ViewportWidth : TimelineScroll.ActualWidth), TrackLeft + (ProjectEnd + 8) * PixelsPerSecond);
-        Timeline.Height = RulerHeight + project.LayerCount * TrackHeight;
-        for (int i = 0; i < project.LayerCount; i++)
+        Timeline.Width = Math.Max((TimelineScroll.ViewportWidth > 0 ? TimelineScroll.ViewportWidth : TimelineScroll.ActualWidth), TrackLeft + (ProjectEnd + 8) * _pixelsPerSecond);
+        Timeline.Height = RulerHeight + _project.LayerCount * TrackHeight;
+        for (int i = 0; i < _project.LayerCount; i++)
         {
-            var label = LayerHeader(i + 1);
+            FrameworkElement label = LayerHeader(i + 1);
             Canvas.SetTop(label, RulerHeight + i * TrackHeight);
             Timeline.Children.Add(label);
-            var line = new Rectangle
+            Rectangle line = new()
             {
                 Width = Timeline.Width,
                 Height = 1,
@@ -331,18 +331,18 @@ public sealed partial class MainWindow
             Timeline.Children.Add(line);
         }
 
-        Timeline.Children.Add(timelineRuler);
+        Timeline.Children.Add(_timelineRuler);
         DrawTimelineRuler();
 
-        foreach (var clip in project.Clips)
+        foreach (EditClip clip in _project.Clips)
         {
-            var view = new TimelineClipView
+            TimelineClipView view = new()
             {
                 Height = 32,
                 Background = ObjectAppearance.Brush(clip),
                 Tag = clip.Id
             };
-            view.Opacity = project.Layer(clip.Layer).Hidden ? .35 : project.Layer(clip.Layer).Locked ? .65 : 1;
+            view.Opacity = _project.Layer(clip.Layer).Hidden ? .35 : _project.Layer(clip.Layer).Locked ? .65 : 1;
             AddWaveform(view, clip);
             view.Children.Add(new TextBlock {
                 Text = (clip.Kind == "audio" ? "♪ " : clip.Kind == "subtitle" ? "字幕: " : "") + clip.ToString(),
@@ -353,7 +353,7 @@ public sealed partial class MainWindow
                 IsHitTestVisible = false
             });
             // Explicit handles remain visible even on narrow clips.
-            foreach (var alignment in new[]
+            foreach (HorizontalAlignment alignment in new[]
             {
                 HorizontalAlignment.Left,
                 HorizontalAlignment.Right
@@ -368,7 +368,7 @@ public sealed partial class MainWindow
                 });
             view.Children.Add(new Border {
                 Tag = "selection",
-                Visibility = selectedIds.Contains(clip.Id) ? Visibility.Visible : Visibility.Collapsed,
+                Visibility = _selectedIds.Contains(clip.Id) ? Visibility.Visible : Visibility.Collapsed,
                 Margin = new Thickness(-3),
                 Child = new Rectangle { Stroke = ObjectAppearance.Brush(clip), StrokeThickness = 2, StrokeDashArray = new DoubleCollection { 3, 2 }, IsHitTestVisible = false },
                 IsHitTestVisible = false
@@ -385,7 +385,7 @@ public sealed partial class MainWindow
         }
 
         // Keep the visible line thin, with an 8-DIP hit area for grabbing over clips.
-        playheadLine = new Border
+        _playheadLine = new Border
         {
             Width = 8,
             Height = Timeline.Height,
@@ -397,21 +397,21 @@ public sealed partial class MainWindow
                 Background = new SolidColorBrush(Microsoft.UI.Colors.Red)
             }
         };
-        Timeline.Children.Add(playheadLine);
-        UpdatePosition(playhead);
+        Timeline.Children.Add(_playheadLine);
+        UpdatePosition(_playhead);
     }
 
     private void Place(Grid view, EditClip c)
     {
-        view.Width = Math.Max(16, c.Duration * PixelsPerSecond);
-        Canvas.SetLeft(view, TrackLeft + c.Start * PixelsPerSecond);
+        view.Width = Math.Max(16, c.Duration * _pixelsPerSecond);
+        Canvas.SetLeft(view, TrackLeft + c.Start * _pixelsPerSecond);
         Canvas.SetTop(view, RulerHeight + (c.Layer - 1) * TrackHeight + 8);
     }
 
     private void Timeline_PointerPressed(object sender, PointerRoutedEventArgs e)
     {
-        var point = e.GetCurrentPoint(Timeline);
-        if (scrubPointer != null || drag != null || gate.CurrentCount == 0 || !point.Properties.IsLeftButtonPressed || point.Position.X < TrackLeft - 4)
+        Microsoft.UI.Input.PointerPoint point = e.GetCurrentPoint(Timeline);
+        if (_scrubPointer != null || _drag != null || _gate.CurrentCount == 0 || !point.Properties.IsLeftButtonPressed || point.Position.X < TrackLeft - 4)
             return;
         TimelineScroll.Focus(FocusState.Programmatic);
         if (BeginMarquee(e))
@@ -420,23 +420,23 @@ public sealed partial class MainWindow
             return;
         if (!Timeline.CapturePointer(e.Pointer))
             return;
-        scrubPointer = e.Pointer.PointerId;
-        resumeAfterScrub = Preview.MediaPlayer.PlaybackSession.PlaybackState == MediaPlaybackState.Playing || (previewOpening && resumePlayback);
+        _scrubPointer = e.Pointer.PointerId;
+        _resumeAfterScrub = Preview.MediaPlayer.PlaybackSession.PlaybackState == MediaPlaybackState.Playing || (_previewOpening && _resumePlayback);
         Pause();
         ScrubTo(point.Position.X);
         e.Handled = true;
     }
 
-    private void ScrubTo(double x) => Seek(ClipEditing.Snap(Math.Max(0, x - TrackLeft) / PixelsPerSecond));
+    private void ScrubTo(double x) => Seek(ClipEditing.Snap(Math.Max(0, x - TrackLeft) / _pixelsPerSecond));
     private void Timeline_PointerMoved(object sender, PointerRoutedEventArgs e)
     {
-        if (marquee?.PointerId == e.Pointer.PointerId)
+        if (_marquee?.PointerId == e.Pointer.PointerId)
         {
             UpdateMarquee(e);
             return;
         }
 
-        if (scrubPointer != e.Pointer.PointerId)
+        if (_scrubPointer != e.Pointer.PointerId)
             return;
         ScrubTo(e.GetCurrentPoint(Timeline).Position.X);
         e.Handled = true;
@@ -444,14 +444,14 @@ public sealed partial class MainWindow
 
     private void Timeline_PointerReleased(object sender, PointerRoutedEventArgs e)
     {
-        if (marquee?.PointerId == e.Pointer.PointerId)
+        if (_marquee?.PointerId == e.Pointer.PointerId)
         {
             UpdateMarquee(e);
             EndMarquee(false);
             return;
         }
 
-        if (scrubPointer != e.Pointer.PointerId)
+        if (_scrubPointer != e.Pointer.PointerId)
             return;
         ScrubTo(e.GetCurrentPoint(Timeline).Position.X);
         EndScrub();
@@ -460,28 +460,28 @@ public sealed partial class MainWindow
 
     private void Timeline_PointerCanceled(object sender, PointerRoutedEventArgs e)
     {
-        if (marquee?.PointerId == e.Pointer.PointerId)
+        if (_marquee?.PointerId == e.Pointer.PointerId)
         {
             EndMarquee(true);
             return;
         }
 
-        if (scrubPointer == e.Pointer.PointerId)
+        if (_scrubPointer == e.Pointer.PointerId)
             EndScrub();
     }
 
     private void EndScrub()
     {
-        scrubPointer = null;
+        _scrubPointer = null;
         Timeline.ReleasePointerCaptures();
-        if (resumeAfterScrub)
+        if (_resumeAfterScrub)
             Play();
-        resumeAfterScrub = false;
+        _resumeAfterScrub = false;
     }
 
     private async void Clip_PointerPressed(object sender, PointerRoutedEventArgs e)
     {
-        if (scrubPointer != null || drag != null || marquee != null || !e.GetCurrentPoint((Grid)sender).Properties.IsLeftButtonPressed)
+        if (_scrubPointer != null || _drag != null || _marquee != null || !e.GetCurrentPoint((Grid)sender).Properties.IsLeftButtonPressed)
             return;
         TimelineScroll.Focus(FocusState.Programmatic);
         if (ControlPressed)
@@ -491,17 +491,17 @@ public sealed partial class MainWindow
             return;
         }
 
-        if (!gate.Wait(0))
+        if (!_gate.Wait(0))
             return;
-        var view = (Grid)sender;
+        Grid view = (Grid)sender;
         DragState? started = null;
         try
         {
-            var clip = project.Clips.Single(c => c.Id == (string)view.Tag);
-            project.RequireEditable(clip.Layer);
-            project.RequireEditable(project.Clips.Where(c => selectedIds.Contains(c.Id)).Select(c => c.Layer).ToArray());
-            var local = e.GetCurrentPoint(view).Position.X;
-            var state = new DragState
+            EditClip clip = _project.Clips.Single(c => c.Id == (string)view.Tag);
+            _project.RequireEditable(clip.Layer);
+            _project.RequireEditable(_project.Clips.Where(c => _selectedIds.Contains(c.Id)).Select(c => c.Layer).ToArray());
+            double local = e.GetCurrentPoint(view).Position.X;
+            DragState state = new()
             {
                 View = view,
                 Original = ClipEditing.Clone(clip),
@@ -511,30 +511,30 @@ public sealed partial class MainWindow
                 Mode = local < 8 ? -1 : local > view.ActualWidth - 8 ? 1 : 0
             };
             started = state;
-            bool preserveGroup = selectedIds.Contains(clip.Id);
+            bool preserveGroup = _selectedIds.Contains(clip.Id);
             Select(clip, false, preserveSelection: preserveGroup);
             if (state.Mode == 0)
             {
-                state.GroupOriginals = project.Clips.Where(item => selectedIds.Contains(item.Id)).Select(ClipEditing.Clone).ToList();
+                state.GroupOriginals = _project.Clips.Where(item => _selectedIds.Contains(item.Id)).Select(ClipEditing.Clone).ToList();
                 state.GroupCandidates = state.GroupOriginals.Select(ClipEditing.Clone).ToList();
             }
 
             UpdateSelectionBorders();
             Pause();
-            drag = state;
+            _drag = state;
             ((TimelineClipView)view).SetResizeActive(state.Mode != 0);
             if (!view.CapturePointer(e.Pointer))
             {
-                drag = null;
+                _drag = null;
                 ((TimelineClipView)view).SetResizeActive(false);
-                gate.Release();
+                _gate.Release();
                 return;
             }
 
             e.Handled = true;
             if (!clip.IsStill && state.Mode != 0)
             {
-                var file = await StorageFile.GetFileFromPathAsync(clip.Path);
+                StorageFile file = await StorageFile.GetFileFromPathAsync(clip.Path);
                 state.SourceDuration = clip.Kind == "audio" ? (await BackgroundAudioTrack.CreateFromFileAsync(file)).OriginalDuration.TotalSeconds : (await MediaClip.CreateFromFileAsync(file)).OriginalDuration.TotalSeconds;
             }
         }
@@ -542,13 +542,13 @@ public sealed partial class MainWindow
         {
             Status.Text = ex.Message;
             if (started == null)
-                gate.Release();
-            else if (ReferenceEquals(drag, started))
+                _gate.Release();
+            else if (ReferenceEquals(_drag, started))
             {
-                drag = null;
+                _drag = null;
                 ((TimelineClipView)view).SetResizeActive(false);
                 view.ReleasePointerCaptures();
-                gate.Release();
+                _gate.Release();
                 Draw();
             }
         }
@@ -556,18 +556,18 @@ public sealed partial class MainWindow
 
     private void Clip_PointerMoved(object sender, PointerRoutedEventArgs e)
     {
-        var state = drag;
+        DragState? state = _drag;
         if (state == null || !ReferenceEquals(state.View, sender))
             return;
-        var point = e.GetCurrentPoint(Timeline).Position;
-        double delta = (point.X - state.Origin.X) / PixelsPerSecond;
+        Point point = e.GetCurrentPoint(Timeline).Position;
+        double delta = (point.X - state.Origin.X) / _pixelsPerSecond;
         if (state.Mode == 0 && state.GroupOriginals.Count > 1)
         {
             state.GroupCandidates = ClipEditing.MoveGroup(state.GroupOriginals, delta, (int)Math.Round((point.Y - state.Origin.Y) / TrackHeight));
             state.Candidate = state.GroupCandidates.Single(clip => clip.Id == state.Original.Id);
-            foreach (var candidate in state.GroupCandidates)
+            foreach (EditClip candidate in state.GroupCandidates)
             {
-                var groupView = Timeline.Children.OfType<TimelineClipView>().Single(view => (string)view.Tag == candidate.Id);
+                TimelineClipView groupView = Timeline.Children.OfType<TimelineClipView>().Single(view => (string)view.Tag == candidate.Id);
                 Place(groupView, candidate);
             }
         }
@@ -582,7 +582,7 @@ public sealed partial class MainWindow
             {
                 state.Candidate = ClipEditing.Resize(state.Original, delta, state.Mode == -1, state.SourceDuration);
             }
-            state.Candidate = ClipEditing.SnapToEdges(state.Candidate, project.Clips.Where(clip => !selectedIds.Contains(clip.Id)), state.Mode, 8 / PixelsPerSecond, state.SourceDuration);
+            state.Candidate = ClipEditing.SnapToEdges(state.Candidate, _project.Clips.Where(clip => !_selectedIds.Contains(clip.Id)), state.Mode, 8 / _pixelsPerSecond, state.SourceDuration);
             state.GroupCandidates = [state.Candidate];
         }
 
@@ -594,10 +594,10 @@ public sealed partial class MainWindow
 
     private async void Clip_PointerReleased(object sender, PointerRoutedEventArgs e)
     {
-        var state = drag;
+        DragState? state = _drag;
         if (state == null || !ReferenceEquals(state.View, sender))
             return;
-        drag = null;
+        _drag = null;
         ((TimelineClipView)state.View).SetResizeActive(false);
         state.View.ReleasePointerCaptures();
         e.Handled = true;
@@ -605,7 +605,7 @@ public sealed partial class MainWindow
         {
             if (state.Changed)
             {
-                var previous = ProjectSnapshot();
+                string previous = ProjectSnapshot();
                 await CommitTimelineCandidates(state.GroupCandidates);
                 await AutoSaveChanges(previous);
             }
@@ -616,36 +616,36 @@ public sealed partial class MainWindow
         }
         finally
         {
-            Select(project.Clips.Single(c => c.Id == state.Original.Id), preserveSelection: true);
-            gate.Release();
+            Select(_project.Clips.Single(c => c.Id == state.Original.Id), preserveSelection: true);
+            _gate.Release();
         }
     }
 
     private void Clip_PointerCanceled(object sender, PointerRoutedEventArgs e)
     {
-        if (drag == null || !ReferenceEquals(drag.View, sender))
+        if (_drag == null || !ReferenceEquals(_drag.View, sender))
             return;
-        var state = drag;
-        drag = null;
+        DragState state = _drag;
+        _drag = null;
         ((TimelineClipView)state.View).SetResizeActive(false);
         state.View.ReleasePointerCaptures();
-        gate.Release();
+        _gate.Release();
         Select(state.Original, preserveSelection: true);
     }
 
     private async Task<object> Split(string id, double seconds)
     {
-        var next = project.Copy();
-        var index = next.Clips.FindIndex(c => c.Id == id);
+        EditProject next = _project.Copy();
+        int index = next.Clips.FindIndex(c => c.Id == id);
         if (index < 0)
             throw new ArgumentException("クリップを選択してください。");
-        project.RequireEditable(next.Clips[index].Layer);
-        var parts = ClipEditing.Split(next.Clips[index], seconds);
+        _project.RequireEditable(next.Clips[index].Layer);
+        (EditClip Left, EditClip Right) parts = ClipEditing.Split(next.Clips[index], seconds);
         next.Clips[index] = parts.Left;
         next.Clips.Insert(index + 1, parts.Right);
         await CompositionBuilder.Build(next);
         Remember();
-        project = next;
+        _project = next;
         Select(parts.Right);
         await Refresh();
         return new
@@ -657,9 +657,9 @@ public sealed partial class MainWindow
 
     private async void Split_Click(object sender, RoutedEventArgs e) => await Run(async () =>
     {
-        if (selected == null)
+        if (_selected == null)
             throw new ArgumentException("分割するクリップを選択してください。");
-        await Split(selected, playhead);
+        await Split(_selected, _playhead);
     });
 }
 

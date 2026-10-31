@@ -8,16 +8,16 @@ using Windows.Storage.Pickers;
 namespace VideoEditor;
 public sealed partial class MainWindow
 {
-    private string ProjectSnapshot() => JsonSerializer.Serialize(project);
+    private string ProjectSnapshot() => JsonSerializer.Serialize(_project);
 
     private async Task AutoSaveChanges(string previous)
     {
-        if (!preferences.AutoSaveEnabled || string.IsNullOrWhiteSpace(project.WorkspaceDirectory) || previous == ProjectSnapshot())
+        if (!_preferences.AutoSaveEnabled || string.IsNullOrWhiteSpace(_project.WorkspaceDirectory) || previous == ProjectSnapshot())
             return;
         try
         {
-            var directory = Path.TrimEndingDirectorySeparator(Path.GetFullPath(project.WorkspaceDirectory));
-            var name = Path.GetFileName(directory);
+            string directory = Path.TrimEndingDirectorySeparator(Path.GetFullPath(_project.WorkspaceDirectory));
+            string name = Path.GetFileName(directory);
             if (string.IsNullOrEmpty(name)) name = "Project";
             await Save(Path.Combine(directory, name + ".hve"));
         }
@@ -29,50 +29,50 @@ public sealed partial class MainWindow
 
     private async Task Save(string path)
     {
-        var full = Path.GetFullPath(path);
-        var temp = full + ".tmp";
-        await File.WriteAllTextAsync(temp, JsonSerializer.Serialize(project, new JsonSerializerOptions { WriteIndented = true }));
+        string full = Path.GetFullPath(path);
+        string temp = full + ".tmp";
+        await File.WriteAllTextAsync(temp, JsonSerializer.Serialize(_project, new JsonSerializerOptions { WriteIndented = true }));
         File.Move(temp, full, true);
         Status.Text = $"保存しました: {full}";
     }
 
     private async Task Open(string path)
     {
-        var next = JsonSerializer.Deserialize<EditProject>(await File.ReadAllTextAsync(path)) ?? throw new ArgumentException("無効なプロジェクトです。");
+        EditProject next = JsonSerializer.Deserialize<EditProject>(await File.ReadAllTextAsync(path)) ?? throw new ArgumentException("無効なプロジェクトです。");
         await CompositionBuilder.Build(next);
         Remember();
-        project = next;
-        selectedIds.Clear();
-        selected = null;
+        _project = next;
+        _selectedIds.Clear();
+        _selected = null;
         Draw();
-        await LoadWorkspaceDirectory(project.WorkspaceDirectory);
+        await LoadWorkspaceDirectory(_project.WorkspaceDirectory);
         await Refresh();
-        if (!string.IsNullOrWhiteSpace(project.WorkspaceDirectory))
+        if (!string.IsNullOrWhiteSpace(_project.WorkspaceDirectory))
         {
-            preferences.RememberWorkspace(project.WorkspaceDirectory);
+            _preferences.RememberWorkspace(_project.WorkspaceDirectory);
             UpdateRecentWorkspacesMenu();
-            preferences.Save(AppPreferences.DefaultPath);
+            _preferences.Save(AppPreferences.DefaultPath);
         }
     }
 
     private async void Save_Click(object sender, RoutedEventArgs e) => await Run(async () =>
     {
-        var picker = new FileSavePicker
+        FileSavePicker picker = new()
         {
             SuggestedFileName = "Project"
         };
         InitPicker(picker);
         picker.FileTypeChoices.Add("Hikari Project", new[] { ".hve" });
-        var file = await picker.PickSaveFileAsync();
+        StorageFile file = await picker.PickSaveFileAsync();
         if (file != null)
             await Save(file.Path);
     });
     private async void Open_Click(object sender, RoutedEventArgs e) => await Run(async () =>
     {
-        var picker = new FileOpenPicker();
+        FileOpenPicker picker = new();
         InitPicker(picker);
         picker.FileTypeFilter.Add(".hve");
-        var file = await picker.PickSingleFileAsync();
+        StorageFile file = await picker.PickSingleFileAsync();
         if (file != null)
             await Open(file.Path);
     });

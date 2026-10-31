@@ -8,14 +8,14 @@ namespace VideoEditor;
 
 public sealed partial class MainWindow
 {
-    private readonly HashSet<string> failedAudio = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _failedAudio = new(StringComparer.OrdinalIgnoreCase);
 
     private async Task ApplyTimelineProject(EditProject next)
     {
-        var prepared = await CompositionBuilder.Build(next);
+        Windows.Media.Editing.MediaComposition prepared = await CompositionBuilder.Build(next);
         Remember();
-        project = next;
-        selectedIds.RemoveWhere(id => !project.Clips.Any(c => c.Id == id));
+        _project = next;
+        _selectedIds.RemoveWhere(id => !_project.Clips.Any(c => c.Id == id));
         UpdatePrimarySelection();
         Draw();
         await Refresh(prepared);
@@ -23,22 +23,22 @@ public sealed partial class MainWindow
 
     private async Task DeleteSelection(bool ripple)
     {
-        var ids = selectedIds.ToHashSet();
-        if (ids.Count == 0 && selected != null) ids.Add(selected);
+        HashSet<string> ids = _selectedIds.ToHashSet();
+        if (ids.Count == 0 && _selected != null) ids.Add(_selected);
         if (ids.Count == 0) return;
-        await ApplyTimelineProject(TimelineOperations.Delete(project, ids, ripple));
+        await ApplyTimelineProject(TimelineOperations.Delete(_project, ids, ripple));
     }
     private async void RippleDelete_Click(object sender, RoutedEventArgs e) => await Run(() => DeleteSelection(true));
-    private async void CloseGaps_Click(object sender, RoutedEventArgs e) => await Run(() => ApplyTimelineProject(TimelineOperations.CloseGaps(project)));
+    private async void CloseGaps_Click(object sender, RoutedEventArgs e) => await Run(() => ApplyTimelineProject(TimelineOperations.CloseGaps(_project)));
 
     private FrameworkElement LayerHeader(int number)
     {
-        var settings = project.Layer(number);
-        var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4, Height = 40 };
+        LayerSettings settings = _project.Layer(number);
+        StackPanel row = new() { Orientation = Orientation.Horizontal, Spacing = 4, Height = 40 };
         row.Children.Add(new TextBlock { Text = $"{number}", Width = 28, VerticalAlignment = VerticalAlignment.Center, TextAlignment = TextAlignment.Center });
         void Add(string glyph, string name, bool active, Action<LayerSettings, bool> set)
         {
-            var button = new Microsoft.UI.Xaml.Controls.Primitives.ToggleButton
+            Microsoft.UI.Xaml.Controls.Primitives.ToggleButton button = new()
             {
                 Content = new FontIcon { Glyph = glyph, FontSize = 14 }, IsChecked = active,
                 Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent),
@@ -49,8 +49,8 @@ public sealed partial class MainWindow
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(button, $"レイヤー {number}: {name}");
             button.Click += async (_, _) => await Run(async () =>
             {
-                var next = project.Copy();
-                if (!next.Layers.TryGetValue(number, out var state)) next.Layers[number] = state = new();
+                EditProject next = _project.Copy();
+                if (!next.Layers.TryGetValue(number, out LayerSettings? state)) next.Layers[number] = state = new();
                 set(state, button.IsChecked == true);
                 try { await ApplyTimelineProject(next); }
                 catch { Draw(); throw; }
@@ -65,8 +65,8 @@ public sealed partial class MainWindow
 
     private async void AddWaveform(Grid view, EditClip clip)
     {
-        if (clip.Kind is not ("audio" or "video") || failedAudio.Contains(clip.Path)) return;
-        var shape = new Polyline
+        if (clip.Kind is not ("audio" or "video") || _failedAudio.Contains(clip.Path)) return;
+        Polyline shape = new()
         {
             Stroke = new SolidColorBrush(Microsoft.UI.Colors.White), StrokeThickness = 1,
             Opacity = .65, IsHitTestVisible = false, HorizontalAlignment = HorizontalAlignment.Left,
@@ -75,11 +75,11 @@ public sealed partial class MainWindow
         view.Children.Insert(0, shape);
         try
         {
-            var audio = await AudioAnalysis.Get(clip.Path);
-            if (closed) return;
-            double width = Math.Max(16, clip.Duration * PixelsPerSecond);
+            PcmAudio audio = await AudioAnalysis.Get(clip.Path);
+            if (_closed) return;
+            double width = Math.Max(16, clip.Duration * _pixelsPerSecond);
             int count = Math.Clamp((int)Math.Ceiling(width / 2), 2, 2048);
-            var points = new PointCollection();
+            PointCollection points = new();
             for (int i = 0; i < count; i++)
             {
                 double local = clip.Duration * i / count;
@@ -92,8 +92,8 @@ public sealed partial class MainWindow
         }
         catch (Exception)
         {
-            failedAudio.Add(clip.Path);
-            if (!closed && clip.Kind == "audio") ToolTipService.SetToolTip(view, $"{clip}\n音声波形を解析できませんでした。素材を確認してください。");
+            _failedAudio.Add(clip.Path);
+            if (!_closed && clip.Kind == "audio") ToolTipService.SetToolTip(view, $"{clip}\n音声波形を解析できませんでした。素材を確認してください。");
         }
     }
 }

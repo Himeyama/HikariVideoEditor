@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" fill="none">
+  <title>VideoEditor</title>
+  <desc>Three rounded timeline clips in red, blue, and red, with soft shadows and a transparent background.</desc>
+  <defs>
+    <linearGradient id="red-top" x1="32" y1="44" x2="184" y2="96" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FF777D"/>
+      <stop offset="1" stop-color="#E73850"/>
+    </linearGradient>
+    <linearGradient id="blue" x1="60" y1="108" x2="224" y2="160" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#25B9FF"/>
+      <stop offset="1" stop-color="#0865EE"/>
+    </linearGradient>
+    <linearGradient id="red-bottom" x1="100" y1="172" x2="224" y2="224" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FF777D"/>
+      <stop offset="1" stop-color="#E73850"/>
+    </linearGradient>
+    <filter id="shadow" x="0" y="0" width="256" height="256" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="5" stdDeviation="5" flood-color="#162B48" flood-opacity="0.20"/>
+      <feDropShadow dx="0" dy="1" stdDeviation="1" flood-color="#162B48" flood-opacity="0.14"/>
+    </filter>
+  </defs>
+  <g filter="url(#shadow)">
+    <rect x="32" y="44" width="152" height="52" rx="12" fill="url(#red-top)"/>
+    <rect x="60" y="108" width="164" height="52" rx="12" fill="url(#blue)"/>
+    <rect x="100" y="172" width="124" height="52" rx="12" fill="url(#red-bottom)"/>
+  </g>
+</svg>

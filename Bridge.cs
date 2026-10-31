@@ -161,7 +161,7 @@ public sealed class Bridge : IDisposable
     public void Dispose()
     {
         // Stop asynchronously so an in-flight UI command cannot deadlock window shutdown.
-        _ = Stop();
+        _ = Task.Run(Stop);
     }
 
     private async Task Stop()

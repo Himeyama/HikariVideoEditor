@@ -29,9 +29,15 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 if (!$SkipLaunch) {
     $executable = Join-Path $PSScriptRoot "bin\x64\$Configuration\net8.0-windows10.0.19041.0\win-x64\VideoEditor.exe"
     if ($OutputDirectory) { $executable = Join-Path $outputPath 'VideoEditor.exe' }
-    $app = Start-Process -FilePath $executable -WorkingDirectory $PSScriptRoot -PassThru
+    $app = Start-Process -FilePath $executable -WorkingDirectory (Split-Path -Parent $executable) -PassThru
+    for ($attempt = 0; $attempt -lt 150; $attempt++) {
+        $app.Refresh()
+        if ($app.HasExited -or $app.MainWindowHandle -ne 0) { break }
+        Start-Sleep -Milliseconds 100
+    }
     Start-Sleep -Seconds 2
     $app.Refresh()
     if ($app.HasExited) { throw "アプリが起動直後に終了しました（終了コード: $($app.ExitCode)）。" }
-    Write-Host "アプリを起動しました（PID: $($app.Id)）。"
+    if ($app.MainWindowHandle -eq 0) { throw 'アプリのウィンドウを確認できませんでした。' }
+    Write-Host "アプリを起動しました（PID: $($app.Id)、ウィンドウ: $($app.MainWindowTitle)）。"
 }

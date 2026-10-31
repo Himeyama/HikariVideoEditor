@@ -13,7 +13,9 @@
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="0" x:Name="TitleRightInset" />
             </Grid.ColumnDefinitions>
-            <MenuBar Grid.Column="1" Background="Transparent" VerticalAlignment="Stretch">
+            <StackPanel Grid.Column="1" Orientation="Horizontal">
+            <Image Source="ms-appx:///Assets/VideoEditor.png" Width="24" Height="24" Margin="12,0,8,0" VerticalAlignment="Center" AutomationProperties.Name="Video Editor" />
+            <MenuBar Background="Transparent" VerticalAlignment="Stretch">
                 <local:MenuBarAction x:Name="UndoButton" Title="&#xE7A7;" Background="Transparent" Click="Undo_Click" ToolTipService.ToolTip="元に戻す (Ctrl+Z)" AutomationProperties.Name="元に戻す" />
                 <local:MenuBarAction x:Name="RedoButton" Title="&#xE7A6;" Background="Transparent" Click="Redo_Click" ToolTipService.ToolTip="やりなおし (Ctrl+Y)" AutomationProperties.Name="やりなおし" />
                 <MenuBarItem Title="ファイル">
@@ -47,6 +49,7 @@
                     <MenuFlyoutItem Text="プレビュー更新" Click="Refresh_Click" />
                 </MenuBarItem>
             </MenuBar>
+            </StackPanel>
             <Grid x:Name="TitleDragRegion" Grid.Column="2" Background="Transparent" />
         </Grid>
         <Frame x:Name="MainFrame" Grid.Row="1" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch">
@@ -262,7 +265,14 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <Button Style="{StaticResource StatusButtonStyle}" Click="SeekPosition_Click" ToolTipService.ToolTip="指定した秒数へ移動" AutomationProperties.Name="指定した秒数へ移動"><TextBlock x:Name="TimelinePositionStatus" /></Button>
-                <TextBlock x:Name="Status" Grid.Column="1" Text="準備完了" TextTrimming="CharacterEllipsis" Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
+                <Grid Grid.Column="1" ColumnSpacing="6">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock x:Name="StatusSpinner" Text="⠋" Width="16" FontFamily="Segoe UI Symbol" Visibility="Collapsed" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" AutomationProperties.Name="処理中" />
+                    <TextBlock x:Name="Status" Grid.Column="1" Text="準備完了" TextTrimming="CharacterEllipsis" Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
+                </Grid>
                 <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4">
                     <Button x:Name="VoicevoxStatusButton" Visibility="Collapsed" Style="{StaticResource StatusButtonStyle}" Click="VoicevoxStatus_Click" AutomationProperties.Name="VOICEVOX"><TextBlock x:Name="VoicevoxStatus" /></Button>
                     <Button Style="{StaticResource StatusButtonStyle}" Click="McpConnection_Click" ToolTipService.ToolTip="生成AIへの接続" AutomationProperties.Name="生成AIへの接続"><TextBlock x:Name="McpPortStatus" /></Button>

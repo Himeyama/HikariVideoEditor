@@ -67,6 +67,7 @@ public sealed partial class MainWindow
     {
         if (_applyingObjectSettings) return;
         _applyingObjectSettings = true;
+        using IDisposable operation = BeginStatusOperation();
         await _gate.WaitAsync();
         EditClip? original = null;
         NumberBox? invalidInput = entered;

@@ -25,6 +25,8 @@ public sealed partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        _savedProjectSnapshot = ProjectSnapshot();
+        AppWindow.Closing += Window_Closing;
         UpdateRecentWorkspacesMenu();
         InitializePages();
         InitializeStatusMessages();
@@ -54,7 +56,6 @@ public sealed partial class MainWindow : Window
         _bridge = new Bridge(DispatchCommand);
         Closed += (_, _) =>
         {
-            SavePanelLayout();
             _closed = true;
             _workspaceWatcher?.Dispose();
             _workspaceRefreshTimer?.Stop();
@@ -75,6 +76,7 @@ public sealed partial class MainWindow : Window
 
     private async Task Run(Func<Task> action)
     {
+        using IDisposable operation = BeginStatusOperation();
         await _gate.WaitAsync();
         try
         {

@@ -24,6 +24,14 @@ New-Item -ItemType Directory -Path $publishPath -Force | Out-Null
 & "$PSScriptRoot\..\build.ps1" -Configuration Release -Publish -Version $Version -OutputDirectory $publishPath -SkipLaunch
 if ($LASTEXITCODE -ne 0) { throw "Publish failed: $LASTEXITCODE" }
 if (!(Test-Path "$publishPath\VideoEditor.exe")) { throw 'VideoEditor.exe がありません。' }
+# A successful .NET publish can still omit WinUI's generated resources.
+$requiredResources = @('VideoEditor.pri') + @(Get-ChildItem -LiteralPath "$PSScriptRoot\.." -Filter '*.xaml' -File | ForEach-Object { $_.BaseName + '.xbf' })
+foreach ($resource in $requiredResources) {
+    $resourcePath = Join-Path $publishPath $resource
+    if (!(Test-Path -LiteralPath $resourcePath -PathType Leaf) -or (Get-Item -LiteralPath $resourcePath).Length -eq 0) {
+        throw "起動に必要な WinUI リソースがありません: $resource"
+    }
+}
 $installer = Join-Path $outputPath "VideoEditor-$Version-win-x64-Setup.exe"
 & $MakeNsis /V3 "/DAPP_VERSION=$Version" "/DSOURCE_DIR=$publishPath" "/DOUTPUT_FILE=$installer" "$PSScriptRoot\VideoEditor.nsi"
 if ($LASTEXITCODE -ne 0) { throw "NSIS failed: $LASTEXITCODE" }

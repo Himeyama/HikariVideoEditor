@@ -8,6 +8,8 @@ using Windows.Storage.Pickers;
 namespace VideoEditor;
 public sealed partial class MainWindow
 {
+    private string? _savedProjectSnapshot;
+    private string? _savedProjectPath;
     private string ProjectSnapshot() => JsonSerializer.Serialize(_project);
 
     private async Task AutoSaveChanges(string previous)
@@ -31,8 +33,11 @@ public sealed partial class MainWindow
     {
         string full = Path.GetFullPath(path);
         string temp = full + ".tmp";
+        string snapshot = ProjectSnapshot();
         await File.WriteAllTextAsync(temp, JsonSerializer.Serialize(_project, new JsonSerializerOptions { WriteIndented = true }));
         File.Move(temp, full, true);
+        _savedProjectSnapshot = snapshot;
+        _savedProjectPath = full;
         Status.Text = $"保存しました: {full}";
     }
 
@@ -47,6 +52,8 @@ public sealed partial class MainWindow
         Draw();
         await LoadWorkspaceDirectory(_project.WorkspaceDirectory);
         await Refresh();
+        _savedProjectSnapshot = ProjectSnapshot();
+        _savedProjectPath = Path.GetFullPath(path);
         if (!string.IsNullOrWhiteSpace(_project.WorkspaceDirectory))
         {
             _preferences.RememberWorkspace(_project.WorkspaceDirectory);

@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <Version>0.3.0</Version>
+    <Version>0.4.0</Version>
     <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
     <TargetPlatformMinVersion>10.0.19041.0</TargetPlatformMinVersion>
     <UseWinUI>true</UseWinUI>
@@ -13,11 +13,29 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets/VideoEditor.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
+    <Content Include="Assets/VideoEditor.ico" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="Assets/VideoEditor.png" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <Compile Remove="tests/**/*.cs" />
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.6.250602001" />
   </ItemGroup>
-<ItemGroup><FrameworkReference Include="Microsoft.WindowsDesktop.App.WindowsForms" /></ItemGroup><ItemGroup><EmbeddedResource Include="Assets/ImageTemplates/*.png" LogicalName="VideoEditor.ImageTemplates.%(Filename).png" /></ItemGroup></Project>
+<ItemGroup><FrameworkReference Include="Microsoft.WindowsDesktop.App.WindowsForms" /></ItemGroup><ItemGroup><EmbeddedResource Include="Assets/ImageTemplates/*.png" LogicalName="VideoEditor.ImageTemplates.%(Filename).png" /></ItemGroup>
+  <!-- WinUI build outputs are not automatically included by .NET Publish. -->
+  <Target Name="PublishXamlResources" AfterTargets="ComputeResolvedFilesToPublishList" DependsOnTargets="_GenerateProjectPriFile">
+    <ItemGroup>
+      <ResolvedFileToPublish Include="$(ProjectPriFullPath)" Exclude="@(ResolvedFileToPublish)">
+        <RelativePath>$(ProjectPriFileName)</RelativePath>
+        <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      </ResolvedFileToPublish>
+      <ResolvedFileToPublish Include="@(GeneratedXamlDest)" Exclude="@(ResolvedFileToPublish)"
+                             Condition="'%(GeneratedXamlDest.Extension)' == '.xbf' or '%(GeneratedXamlDest.Extension)' == '.xaml'">
+        <RelativePath>$([MSBuild]::MakeRelative($([System.IO.Path]::GetFullPath('$(OutputPath)')), '%(FullPath)'))</RelativePath>
+        <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      </ResolvedFileToPublish>
+    </ItemGroup>
+  </Target>
+</Project>
 

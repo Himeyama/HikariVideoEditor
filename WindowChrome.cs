@@ -11,6 +11,7 @@ public sealed partial class MainWindow
     private static extern uint GetDpiForWindow(nint hwnd);
     private void ConfigureWindow()
     {
+        AppWindow.SetIcon(Path.Combine(AppContext.BaseDirectory, "Assets", "VideoEditor.ico"));
         // XAML sizes are DIPs; AppWindow sizes and caption insets are physical pixels.
         uint dpi = GetDpiForWindow(WinRT.Interop.WindowNative.GetWindowHandle(this));
         double scale = dpi == 0 ? 1 : dpi / 96.0;

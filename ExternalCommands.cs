@@ -8,6 +8,7 @@ public sealed partial class MainWindow
         TaskCompletionSource<object> completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
         if (_closed || !DispatcherQueue.TryEnqueue(async () =>
         {
+            using IDisposable operation = BeginStatusOperation();
             await _gate.WaitAsync();
             try
             {

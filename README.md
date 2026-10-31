@@ -4,6 +4,10 @@
 
 <img width="600" src="https://github.com/user-attachments/assets/6a1b72ce-b3df-4f32-a02e-0fb063b04e88" />
 
+## 生成 AI による自動編集
+
+デモ: https://www.youtube.com/watch?v=Xto-YFJ2A88
+
 ## ビルドと起動
 
 Visual Studio 2022 の Windows App SDK / WinUI と .NET デスクトップ開発環境、Windows SDK が必要です。

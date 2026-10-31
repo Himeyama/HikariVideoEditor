@@ -16,7 +16,7 @@ public static class SubtitleRenderer
         video.Validate();
         string key = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new
         {
-            clip.Text, clip.Subtitle, video.Width, video.Height, clip.Scale, clip.ScaleX, clip.ScaleY, RendererVersion = 4
+            clip.Text, clip.Subtitle, video.Width, video.Height, clip.Scale, clip.ScaleX, clip.ScaleY, RendererVersion = 5
         }))));
         string directory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "HikariVideoEditor", "subtitles");
         Directory.CreateDirectory(directory);
@@ -35,7 +35,7 @@ public static class SubtitleRenderer
         using GraphicsPath outline = new(FillMode.Winding);
         outline.AddString(clip.Text.ReplaceLineEndings("\n"), family, (int)FontStyle.Regular, (float)style.FontSize,
             new RectangleF(marginX, marginY, video.Width - marginX * 2, video.Height - marginY * 2), format);
-        using Pen pen = new(Color.Black, Math.Max(2, (float)style.FontSize / 14)) { LineJoin = LineJoin.Round };
+        using Pen pen = new(ColorTranslator.FromHtml(style.OuterColor), style.TextType == "outline" ? Math.Max(4, (float)style.FontSize / 7) : 0) { LineJoin = LineJoin.Round };
         RectangleF ink = outline.GetBounds(null, pen);
         ink.Inflate(2, 2);
         Rectangle crop = Rectangle.Intersect(Rectangle.FromLTRB((int)Math.Floor(ink.Left), (int)Math.Floor(ink.Top),
@@ -57,8 +57,14 @@ public static class SubtitleRenderer
         using Matrix transform = new((float)pixelWidth / crop.Width, 0, 0, (float)pixelHeight / crop.Height,
             -(float)crop.X * pixelWidth / crop.Width, -(float)crop.Y * pixelHeight / crop.Height);
         graphics.Transform = transform;
-        graphics.DrawPath(pen, outline);
-        graphics.FillPath(Brushes.White, outline);
+        if (style.TextType == "outline")
+        {
+            graphics.DrawPath(pen, outline);
+            using Pen inner = new(ColorTranslator.FromHtml(style.InnerColor), Math.Max(2, (float)style.FontSize / 14)) { LineJoin = LineJoin.Round };
+            graphics.DrawPath(inner, outline);
+        }
+        using SolidBrush fill = new(ColorTranslator.FromHtml(style.TextColor));
+        graphics.FillPath(fill, outline);
         string temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
         try
         {

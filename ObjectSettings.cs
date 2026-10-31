@@ -10,16 +10,78 @@ namespace VideoEditor;
 public sealed partial class MainWindow
 {
     private SubtitleSettingsEditor? _objectSubtitleEditor;
+    private string? _displayedSubtitleId;
+    private SubtitleStyle? _displayedSubtitleStyle;
+    private string? _displayedSubtitleText;
+    private bool _displayingSubtitle;
+    private int _subtitleChangeVersion;
+
     private void DisplaySubtitleSettings(EditClip? clip)
     {
+        if (clip?.Kind == "subtitle" && _displayedSubtitleId == clip.Id &&
+            _displayedSubtitleStyle == clip.Subtitle && _displayedSubtitleText == clip.Text) return;
+        _subtitleChangeVersion++;
+        _displayedSubtitleId = clip?.Kind == "subtitle" ? clip.Id : null;
+        _displayedSubtitleStyle = clip == null ? null : clip.Subtitle with { };
+        _displayedSubtitleText = clip?.Text;
         SubtitleInspector.Visibility = clip?.Kind == "subtitle" ? Visibility.Visible : Visibility.Collapsed;
         _objectSubtitleEditor = null;
         SubtitleStyleHost.Content = null;
         if (clip?.Kind != "subtitle") return;
+        _displayingSubtitle = true;
         SubtitleTextInput.Text = clip.Text;
+        _displayingSubtitle = false;
         _objectSubtitleEditor = new SubtitleSettingsEditor(clip.Subtitle, compact: true);
         _objectSubtitleEditor.ValidationFailed += message => Status.Text = message;
+        _objectSubtitleEditor.StyleChanged += async _ => await ApplySubtitleChangeAsync();
         SubtitleStyleHost.Content = _objectSubtitleEditor;
+    }
+
+    private async void SubtitleTextInput_TextChanged(object sender, TextChangedEventArgs args)
+    {
+        if (!_displayingSubtitle) await ApplySubtitleChangeAsync();
+    }
+
+    private async Task ApplySubtitleChangeAsync()
+    {
+        if (_objectSubtitleEditor == null || _selected != _displayedSubtitleId) return;
+        int version = ++_subtitleChangeVersion;
+        string? id = _displayedSubtitleId;
+        SubtitleSettingsEditor editor = _objectSubtitleEditor;
+        await Task.Delay(250);
+        if (_closed || version != _subtitleChangeVersion || id != _selected) return;
+        SubtitleStyle style;
+        try { style = editor.Read(); }
+        catch (ArgumentException exception) { Status.Text = exception.Message; return; }
+        string text = SubtitleTextInput.Text;
+        if (string.IsNullOrWhiteSpace(text)) return;
+        await _gate.WaitAsync();
+        try
+        {
+            if (_closed || version != _subtitleChangeVersion || id != _selected) return;
+            EditClip? original = _project.Clips.FirstOrDefault(clip => clip.Id == id && clip.Kind == "subtitle");
+            if (original == null || (original.Text == text && original.Subtitle == style)) return;
+            _project.RequireEditable(original.Layer);
+            EditProject next = _project.Copy();
+            EditClip changed = next.Clips.Single(clip => clip.Id == id);
+            changed.Text = text;
+            changed.Subtitle = style;
+            changed.SubtitleOverrides = SubtitleOverrides.Explicit(style);
+            Windows.Media.Editing.MediaComposition prepared = await CompositionBuilder.Build(next);
+            EditProject previous = _project;
+            _project = next;
+            try { await Refresh(prepared); }
+            catch { _project = previous; throw; }
+            Remember(previous);
+            _displayedSubtitleStyle = style with { };
+            _displayedSubtitleText = text;
+            SelectedName.Text = changed.ToString();
+            Draw();
+            await AutoSaveChanges(System.Text.Json.JsonSerializer.Serialize(previous));
+            Status.Text = "字幕の変更を反映しました。";
+        }
+        catch (Exception exception) { Status.Text = exception.Message; }
+        finally { _gate.Release(); }
     }
 
     private bool _applyingObjectSettings;

@@ -27,6 +27,8 @@ public sealed class EditProject
             throw new ArgumentException("レイヤー設定が不正です。");
         if (Clips.Select(c => c.Id).Distinct().Count() != Clips.Count)
             throw new ArgumentException("クリップIDが重複しています。");
+        if (ClipPlacement.HasOverlap(Clips))
+            throw new ArgumentException("同じレイヤーにオブジェクトを重ねることはできません。開始位置・長さ・レイヤーを変更してください。");
         foreach (EditClip c in Clips)
             c.Validate(Video.FrameRate);
     }

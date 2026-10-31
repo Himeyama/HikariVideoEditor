@@ -122,10 +122,10 @@ public sealed partial class MainWindow
             _project.RequireEditable(_project.Clips.Single(clip => clip.Id == candidate.Id).Layer, candidate.Layer);
             next.Clips[next.Clips.FindIndex(clip => clip.Id == candidate.Id)] = candidate;
         }
-        await CompositionBuilder.Build(next);
+        Windows.Media.Editing.MediaComposition prepared = await CompositionBuilder.Build(next);
         Remember();
         _project = next;
-        await Refresh();
+        await Refresh(prepared);
     }
 
     private async Task MoveSelection(double seconds, int layers)

@@ -10,8 +10,13 @@ public sealed record VoicevoxFavorite(string SpeakerUuid, int StyleId, string Ch
 
 public sealed record SubtitleStyle
 {
+    public static bool IsColor(string? value) => value is { Length: 7 } && value[0] == '#' && uint.TryParse(value.AsSpan(1), System.Globalization.NumberStyles.HexNumber, null, out _);
     public string FontFamily { get; set; } = "Noto Sans JP";
     public double FontSize { get; set; } = 64;
+    public string TextType { get; set; } = "standard";
+    public string TextColor { get; set; } = "#FFFFFF";
+    public string InnerColor { get; set; } = "#000000";
+    public string OuterColor { get; set; } = "#FFFFFF";
     public string Horizontal { get; set; } = "center";
     public string Vertical { get; set; } = "bottom";
     public double MarginX { get; set; } = 80;
@@ -19,6 +24,8 @@ public sealed record SubtitleStyle
 
     public void Validate()
     {
+        if (TextType is not ("standard" or "outline") || !IsColor(TextColor) || !IsColor(InnerColor) || !IsColor(OuterColor))
+            throw new ArgumentException("字幕の種類・色が不正です。");
         if (string.IsNullOrWhiteSpace(FontFamily) || FontFamily.Length > 200 ||
             !double.IsFinite(FontSize) || FontSize is < 8 or > 400 ||
             Horizontal is not ("left" or "center" or "right") || Vertical is not ("top" or "center" or "bottom") ||
@@ -88,6 +95,10 @@ public sealed class AppPreferences
 
 public sealed record SubtitleOverrides
 {
+    public string? TextType { get; set; }
+    public string? TextColor { get; set; }
+    public string? InnerColor { get; set; }
+    public string? OuterColor { get; set; }
     public string? FontFamily { get; set; }
     public double? FontSize { get; set; }
     public string? Horizontal { get; set; }
@@ -97,6 +108,8 @@ public sealed record SubtitleOverrides
 
     public SubtitleStyle Resolve(SubtitleStyle defaults) => new()
     {
+        TextType = TextType ?? defaults.TextType, TextColor = TextColor ?? defaults.TextColor,
+        InnerColor = InnerColor ?? defaults.InnerColor, OuterColor = OuterColor ?? defaults.OuterColor,
         FontFamily = FontFamily ?? defaults.FontFamily, FontSize = FontSize ?? defaults.FontSize,
         Horizontal = Horizontal ?? defaults.Horizontal, Vertical = Vertical ?? defaults.Vertical,
         MarginX = MarginX ?? defaults.MarginX, MarginY = MarginY ?? defaults.MarginY
@@ -104,6 +117,7 @@ public sealed record SubtitleOverrides
 
     public static SubtitleOverrides Explicit(SubtitleStyle style) => new()
     {
+        TextType = style.TextType, TextColor = style.TextColor, InnerColor = style.InnerColor, OuterColor = style.OuterColor,
         FontFamily = style.FontFamily, FontSize = style.FontSize,
         Horizontal = style.Horizontal, Vertical = style.Vertical, MarginX = style.MarginX, MarginY = style.MarginY
     };

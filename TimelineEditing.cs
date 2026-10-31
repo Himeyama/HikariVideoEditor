@@ -43,6 +43,7 @@ public sealed partial class MainWindow
         public bool Changed;
         public List<EditClip> GroupOriginals = [];
         public List<EditClip> GroupCandidates = [];
+        public List<EditClip> StationaryClips = [];
     }
 
     private void InitializePlayback()
@@ -403,7 +404,7 @@ public sealed partial class MainWindow
 
     private void Place(Grid view, EditClip c)
     {
-        view.Width = Math.Max(16, c.Duration * _pixelsPerSecond);
+        view.Width = Math.Max(0.1, c.Duration * _pixelsPerSecond);
         Canvas.SetLeft(view, TrackLeft + c.Start * _pixelsPerSecond);
         Canvas.SetTop(view, RulerHeight + (c.Layer - 1) * TrackHeight + 8);
     }
@@ -519,6 +520,8 @@ public sealed partial class MainWindow
                 state.GroupCandidates = state.GroupOriginals.Select(ClipEditing.Clone).ToList();
             }
 
+            HashSet<string> movingIds = state.Mode == 0 ? state.GroupOriginals.Select(item => item.Id).ToHashSet() : [clip.Id];
+            state.StationaryClips = _project.Clips.Where(item => !movingIds.Contains(item.Id)).ToList();
             UpdateSelectionBorders();
             Pause();
             _drag = state;
@@ -586,6 +589,14 @@ public sealed partial class MainWindow
             state.GroupCandidates = [state.Candidate];
         }
 
+        if (ClipPlacement.OverlapsExisting(state.GroupCandidates, state.StationaryClips))
+        {
+            state.GroupCandidates = state.Mode == 0 && state.GroupOriginals.Count > 1
+                ? state.GroupOriginals.Select(ClipEditing.Clone).ToList() : [ClipEditing.Clone(state.Original)];
+            state.Candidate = state.GroupCandidates.Single(clip => clip.Id == state.Original.Id);
+            foreach (EditClip candidate in state.GroupCandidates)
+                Place(Timeline.Children.OfType<TimelineClipView>().Single(view => (string)view.Tag == candidate.Id), candidate);
+        }
         state.Changed = state.Candidate.Start != state.Original.Start || state.Candidate.Duration != state.Original.Duration || state.Candidate.Layer != state.Original.Layer;
         Place(state.View, state.Candidate);
         Select(state.Candidate, false, preserveSelection: true);

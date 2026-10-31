@@ -8,6 +8,10 @@ namespace VideoEditor;
 public sealed class SubtitleSettingsEditor : StackPanel
 {
     private readonly ComboBox _font;
+    private readonly ComboBox _textType;
+    private readonly TextBox _textColor;
+    private readonly TextBox _innerColor;
+    private readonly TextBox _outerColor;
     private readonly NumberBox _size;
     private readonly ComboBox _horizontal;
     private readonly ComboBox _vertical;
@@ -25,6 +29,32 @@ public sealed class SubtitleSettingsEditor : StackPanel
         this._defaults = defaults ?? value;
         _defaultFontLabel = this._defaults.FontFamily + " (規定)";
         Spacing = 24;
+        _textType = Choice(optional ? ["規定", "標準", "袋文字"] : ["標準", "袋文字"],
+            optional ? overrides?.TextType == null ? 0 : overrides.TextType == "outline" ? 2 : 1 : value.TextType == "outline" ? 1 : 0);
+        TextBox ColorInput(string? color, string fallback) => new() { Text = color ?? "", PlaceholderText = fallback + " (規定)", Width = 220, MaxLength = 7 };
+        _textColor = ColorInput(optional ? overrides?.TextColor : value.TextColor, _defaults.TextColor);
+        _innerColor = ColorInput(optional ? overrides?.InnerColor : value.InnerColor, _defaults.InnerColor);
+        _outerColor = ColorInput(optional ? overrides?.OuterColor : value.OuterColor, _defaults.OuterColor);
+        FrameworkElement ColorControl(TextBox input, string fallback)
+        {
+            ColorPicker picker = new() { IsAlphaEnabled = false, IsAlphaSliderVisible = false };
+            string initial = SubtitleStyle.IsColor(input.Text) ? input.Text : fallback;
+            uint.TryParse(initial.AsSpan(1), NumberStyles.HexNumber, null, out uint rgb);
+            picker.Color = Windows.UI.Color.FromArgb(255, (byte)(rgb >> 16), (byte)(rgb >> 8), (byte)rgb);
+            picker.ColorChanged += (_, args) => input.Text = $"#{args.NewColor.R:X2}{args.NewColor.G:X2}{args.NewColor.B:X2}";
+            Button choose = new() { Content = "色を選択", Flyout = new Flyout { Content = picker } };
+            input.Width = double.NaN;
+            input.HorizontalAlignment = HorizontalAlignment.Stretch;
+            Grid panel = new() { ColumnSpacing = 8, Width = compact ? double.NaN : 220, HorizontalAlignment = HorizontalAlignment.Stretch };
+            panel.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            panel.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            Grid.SetColumn(choose, 1);
+            panel.Children.Add(input);
+            panel.Children.Add(choose);
+            return panel;
+        }
+        (string Label, FrameworkElement Control)[] appearance = [("テキストの種類", _textType), ("文字色（#RRGGBB）", ColorControl(_textColor, _defaults.TextColor)), ("内側の縁色（#RRGGBB）", ColorControl(_innerColor, _defaults.InnerColor)), ("外側の縁色（#RRGGBB）", ColorControl(_outerColor, _defaults.OuterColor))];
+        Children.Add(compact ? CompactGroup("文字の見た目", appearance) : Group("文字の見た目", appearance));
         using System.Drawing.Text.InstalledFontCollection fonts = new();
         _font = new ComboBox { IsEditable = true, Width = 220 };
         if (optional) _font.Items.Add(_defaultFontLabel);
@@ -76,6 +106,15 @@ public sealed class SubtitleSettingsEditor : StackPanel
                     throw new ArgumentException("数値を入力してください。");
                 return number;
             }
+            _textType.SelectionChanged += (_, _) => Change(style => style with { TextType = _textType.SelectedIndex == 1 ? "outline" : "standard" });
+            void ColorChanged(TextBox input, Func<SubtitleStyle, string, SubtitleStyle> update)
+            {
+                if (SubtitleStyle.IsColor(input.Text)) Change(style => update(style, input.Text));
+                else ValidationFailed?.Invoke("色は #RRGGBB 形式で入力してください。");
+            }
+            _textColor.TextChanged += (_, _) => ColorChanged(_textColor, (style, color) => style with { TextColor = color });
+            _innerColor.TextChanged += (_, _) => ColorChanged(_innerColor, (style, color) => style with { InnerColor = color });
+            _outerColor.TextChanged += (_, _) => ColorChanged(_outerColor, (style, color) => style with { OuterColor = color });
             _font.SelectionChanged += (_, _) =>
             {
                 if (_font.SelectedItem is string name) Change(style => style with { FontFamily = name });
@@ -104,6 +143,10 @@ public sealed class SubtitleSettingsEditor : StackPanel
         }
         return new SubtitleOverrides
         {
+            TextType = _optional && _textType.SelectedIndex == 0 ? null : _textType.SelectedIndex - (_optional ? 1 : 0) == 1 ? "outline" : "standard",
+            TextColor = _optional && string.IsNullOrWhiteSpace(_textColor.Text) ? null : _textColor.Text.Trim(),
+            InnerColor = _optional && string.IsNullOrWhiteSpace(_innerColor.Text) ? null : _innerColor.Text.Trim(),
+            OuterColor = _optional && string.IsNullOrWhiteSpace(_outerColor.Text) ? null : _outerColor.Text.Trim(),
             FontFamily = _optional && (string.IsNullOrWhiteSpace(_font.Text) || _font.Text == _defaultFontLabel) ? null : _font.Text.Trim(),
             FontSize = ReadNumber(_size), MarginX = ReadNumber(_marginX), MarginY = ReadNumber(_marginY),
             Horizontal = _optional && _horizontal.SelectedIndex == 0 ? null : new[] { "left", "center", "right" }[_horizontal.SelectedIndex - (_optional ? 1 : 0)],

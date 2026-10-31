@@ -238,9 +238,9 @@
                         <NumberBox x:Name="FadeOutInput" Grid.Row="1" Grid.Column="1" AutomationProperties.Name="音声フェードアウト" Minimum="0" Maximum="86400" Value="0" SmallChange="0.1" SpinButtonPlacementMode="Inline" ValidationMode="Disabled" ValueChanged="ObjectInput_ValueChanged" />
                     </Grid>
                     <StackPanel x:Name="SubtitleInspector" Visibility="Collapsed" Spacing="8">
-                        <TextBox x:Name="SubtitleTextInput" Header="字幕テキスト" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="96" MaxLength="10000" />
+                        <TextBox x:Name="SubtitleTextInput" TextChanged="SubtitleTextInput_TextChanged" Header="字幕テキスト" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="96" MaxLength="10000" />
                         <ContentControl x:Name="SubtitleStyleHost" HorizontalContentAlignment="Stretch" />
-                        <Button Content="字幕の変更を適用" Click="Apply_Click" />
+
                     </StackPanel>
                 </StackPanel>
             </ScrollViewer>

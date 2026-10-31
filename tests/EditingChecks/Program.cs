@@ -144,3 +144,26 @@ Console.WriteLine("PASS: first free layer, interval boundaries, full layers, rel
 }
 
 
+
+EditClip collisionA = new() { Start = 1, Duration = 3, Layer = 1 };
+EditClip collisionB = new() { Start = 3, Duration = 2, Layer = 1 };
+Check(ClipPlacement.HasOverlap([collisionA, collisionB]));
+collisionB.Start = 4;
+Check(!ClipPlacement.HasOverlap([collisionA, collisionB]));
+collisionB.Start = 2; collisionB.Layer = 2;
+Check(!ClipPlacement.HasOverlap([collisionA, collisionB]));
+collisionB.Layer = 1; collisionB.Duration = .1;
+Check(ClipPlacement.HasOverlap([collisionA, collisionB]));
+SubtitleStyle coloredStyle = new() { TextType = "outline", TextColor = "#12ABef", InnerColor = "#123456", OuterColor = "#654321" };
+coloredStyle.Validate();
+Check(SubtitleOverrides.Explicit(coloredStyle).Resolve(new()) == coloredStyle);
+Check(new SubtitleOverrides().Resolve(coloredStyle) == coloredStyle);
+Check(!SubtitleStyle.IsColor("#GGGGGG") && !SubtitleStyle.IsColor("red"));
+Console.WriteLine("PASS: same-layer collisions, touching edges, separate layers, contained clips, subtitle colors and inheritance");
+
+Check(ClipPlacement.OverlapsExisting([collisionB], [collisionA]));
+collisionB.Start = 4;
+Check(!ClipPlacement.OverlapsExisting([collisionB], [collisionA]));
+collisionB.Start = 2; collisionB.Layer = 2;
+Check(!ClipPlacement.OverlapsExisting([collisionB], [collisionA]));
+Console.WriteLine("PASS: drag collision checks preserve touching edges and separate layers");

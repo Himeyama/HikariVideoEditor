@@ -1,7 +1,23 @@
+# Build output (including test projects)
 bin/
 obj/
+artifacts/
+
+# Local IDE state
 .vs/
 *.user
+
+# Local projects and media
 *.hve
 *.mp4
-artifacts/
+/EncodingTest_*/
+
+# Generated screenshots and validation output
+/captures/
+*.log
+
+# Local Python environments and caches
+.uv-cache/
+.venv/
+__pycache__/
+*.pyc

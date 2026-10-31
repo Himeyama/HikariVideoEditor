@@ -53,6 +53,7 @@ public sealed partial class MainWindow : Window
             SavePanelLayout();
             closed = true;
             exportCancellation?.Cancel();
+            downloadCancellation?.Cancel();
             playbackTimer.Stop();
             DisposeStatusMessages();
             if (Root.XamlRoot != null)

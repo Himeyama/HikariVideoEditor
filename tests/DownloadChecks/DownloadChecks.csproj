@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable></PropertyGroup>
+  <ItemGroup><Compile Include="../../VideoDownloadSource.cs" Link="VideoDownloadSource.cs" /></ItemGroup>
+  <ItemGroup><Compile Include="../../AnonymousVideoSession.cs" Link="AnonymousVideoSession.cs" /><Compile Include="../../VideoDownloadHls.cs" Link="VideoDownloadHls.cs" /></ItemGroup>
+  <ItemGroup><Compile Include="../../AnonymousBrowserResolver.cs" Link="AnonymousBrowserResolver.cs" /></ItemGroup>
+  <ItemGroup><Compile Include="../../VideoDownloadDestination.cs" Link="VideoDownloadDestination.cs" /></ItemGroup>
+</Project>

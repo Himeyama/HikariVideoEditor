@@ -126,7 +126,7 @@ public sealed partial class MainWindow
                 project = previous;
                 throw;
             }
-            undo.Push(previous.Copy());
+            Remember(previous);
             Draw();
             DisplayObjectValues(edit);
             SelectedName.Text = edit.ToString();

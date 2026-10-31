@@ -78,7 +78,7 @@ public sealed partial class MainWindow
         project = candidate;
         try { await Refresh(prepared); }
         catch { project = previous; throw; }
-        undo.Push(previous.Copy());
+        Remember(previous);
         Draw();
         Status.Text = "動画設定を反映しました。";
     });

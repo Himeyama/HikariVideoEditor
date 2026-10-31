@@ -159,8 +159,19 @@ public sealed partial class MainWindow
             Play();
     }
 
-    private void Root_PreviewKeyDown(object sender, KeyRoutedEventArgs e)
+    private async void Root_PreviewKeyDown(object sender, KeyRoutedEventArgs e)
     {
+        if (ControlPressed && e.Key is Windows.System.VirtualKey.Z or Windows.System.VirtualKey.Y)
+        {
+            var historyFocus = FocusManager.GetFocusedElement(Root.XamlRoot) as DependencyObject;
+            for (var current = historyFocus; current != null; current = VisualTreeHelper.GetParent(current))
+                if (current is TextBox or RichEditBox or PasswordBox or NumberBox)
+                    return;
+            e.Handled = true;
+            if (!e.KeyStatus.WasKeyDown)
+                await Run(() => e.Key == Windows.System.VirtualKey.Z ? RestoreHistory(undo, redo) : RestoreHistory(redo, undo));
+            return;
+        }
         if (e.Key is not (Windows.System.VirtualKey.Space or Windows.System.VirtualKey.Left or Windows.System.VirtualKey.Right))
             return;
         // Preserve spaces in file names and other text entry fields.

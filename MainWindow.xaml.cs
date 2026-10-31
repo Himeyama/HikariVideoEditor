@@ -14,6 +14,7 @@ public sealed partial class MainWindow : Window
 {
     private EditProject project = new();
     private readonly Stack<EditProject> undo = new();
+    private readonly Stack<EditProject> redo = new();
     private string? selected;
     private readonly Bridge bridge;
     private readonly SemaphoreSlim gate = new(1, 1);
@@ -83,11 +84,25 @@ public sealed partial class MainWindow : Window
 
     private void Remember()
     {
-        undo.Push(project.Copy());
+        Remember(project);
+    }
+
+    private void Remember(EditProject previous)
+    {
+        undo.Push(previous.Copy());
+        redo.Clear();
+        UpdateHistoryButtons();
+    }
+
+    private void UpdateHistoryButtons()
+    {
+        UndoButton.IsEnabled = undo.Count > 0;
+        RedoButton.IsEnabled = redo.Count > 0;
     }
 
     private void Draw()
     {
+        UpdateHistoryButtons();
         ClipEditing.FrameRate = project.Video.FrameRate;
         if (selected == null) DisplaySubtitleSettings(null);
         selectedIds.RemoveWhere(id => !project.Clips.Any(clip => clip.Id == id));
@@ -195,17 +210,24 @@ public sealed partial class MainWindow : Window
         Draw();
         await Refresh();
     });
-    private async void Undo_Click(object sender, RoutedEventArgs e) => await Run(async () =>
+    private async void Undo_Click(object sender, RoutedEventArgs e) => await Run(() => RestoreHistory(undo, redo));
+    private async void Redo_Click(object sender, RoutedEventArgs e) => await Run(() => RestoreHistory(redo, undo));
+
+    private async Task RestoreHistory(Stack<EditProject> from, Stack<EditProject> to)
     {
-        if (undo.TryPop(out var previous))
+        if (from.TryPeek(out var previous))
         {
+            var prepared = await CompositionBuilder.Build(previous);
+            to.Push(project.Copy());
+            from.Pop();
             project = previous;
             selectedIds.Clear();
             selected = null;
+            SelectedName.Text = "クリップ未選択";
             Draw();
-            await Refresh();
+            await Refresh(prepared);
         }
-    });
+    }
 }
 
 

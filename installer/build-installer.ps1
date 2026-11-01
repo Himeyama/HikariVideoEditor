@@ -14,9 +14,9 @@ if (($Version.Split('.') | Where-Object { [long]$_ -gt 65535 }).Count) {
 $hsis = (Get-Command $HsisPath -CommandType Application -ErrorAction Stop).Source
 $templatePath = Join-Path (Split-Path -Parent $hsis) 'Template'
 [xml]$hsisProperties = Get-Content -LiteralPath (Join-Path $templatePath 'Directory.Build.props') -Raw
-if ($hsisProperties.Project.PropertyGroup.Version -ne '0.4.4') { throw 'HSIS v0.4.4 を使用してください。' }
+if ($hsisProperties.Project.PropertyGroup.Version -ne '0.4.6') { throw 'HSIS v0.4.6 を使用してください。' }
 if (!(Test-Path -LiteralPath (Join-Path $templatePath 'src/Hsis.App/Hsis.ico') -PathType Leaf)) {
-    throw 'HSIS テンプレートに Hsis.ico がありません。HSIS v0.4.4 の src/Hsis.App/Hsis.ico を同じ場所へコピーしてください。'
+    throw 'HSIS テンプレートに Hsis.ico がありません。HSIS v0.4.6 の src/Hsis.App/Hsis.ico を同じ場所へコピーしてください。'
 }
 $outputPath = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($OutputDirectory)
 # Each run publishes into an empty directory so old files cannot enter a release.
@@ -25,6 +25,16 @@ New-Item -ItemType Directory -Path $publishPath -Force | Out-Null
 & "$PSScriptRoot\..\build.ps1" -Configuration Release -Publish -Version $Version -OutputDirectory $publishPath -SkipLaunch
 if ($LASTEXITCODE -ne 0) { throw "Publish failed: $LASTEXITCODE" }
 if (!(Test-Path "$publishPath\VideoEditor.exe")) { throw 'VideoEditor.exe がありません。' }
+# Reject framework-dependent or incomplete output before packaging it.
+$runtime = Get-Content -LiteralPath (Join-Path $publishPath 'VideoEditor.runtimeconfig.json') -Raw | ConvertFrom-Json
+if ($runtime.runtimeOptions.framework -or $runtime.runtimeOptions.frameworks -or !$runtime.runtimeOptions.includedFrameworks) {
+    throw 'VideoEditor must be published with SelfContained=true. External .NET runtime requirements are not allowed in the installer.'
+}
+foreach ($runtimeFile in @('coreclr.dll', 'hostfxr.dll', 'hostpolicy.dll', 'System.Private.CoreLib.dll')) {
+    if (!(Test-Path -LiteralPath (Join-Path $publishPath $runtimeFile) -PathType Leaf)) {
+        throw "Missing bundled .NET runtime file: $runtimeFile"
+    }
+}
 # A successful .NET publish can still omit WinUI's generated resources.
 $requiredResources = @('VideoEditor.pri') + @(Get-ChildItem -LiteralPath "$PSScriptRoot\.." -Filter '*.xaml' -File | ForEach-Object { $_.BaseName + '.xbf' })
 foreach ($resource in $requiredResources) {

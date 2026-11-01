@@ -26,11 +26,11 @@ jobs:
       - uses: actions/checkout@v4
         with:
           path: VideoEditor
-      - name: Check out HSIS v0.4.4
+      - name: Check out HSIS v0.4.6
         uses: actions/checkout@v4
         with:
           repository: Himeyama/hsis
-          ref: v0.4.4
+          ref: v0.4.6
           path: hsis
           persist-credentials: false
       - uses: actions/setup-dotnet@v4
@@ -45,13 +45,13 @@ jobs:
           $version = if ($env:GITHUB_EVENT_NAME -eq 'push') { $env:GITHUB_REF_NAME.Substring(1) } else { $env:INPUT_VERSION }
           if ($version -notmatch '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$') { throw 'Expected vMAJOR.MINOR.PATCH tag or MAJOR.MINOR.PATCH input' }
           "version=$version" >> $env:GITHUB_OUTPUT
-      - name: Build HSIS v0.4.4
+      - name: Build HSIS v0.4.6
         shell: pwsh
         run: |
-          $toolPath = Join-Path $env:RUNNER_TEMP 'hsis-v0.4.4'
+          $toolPath = Join-Path $env:RUNNER_TEMP 'hsis-v0.4.6'
           dotnet publish ../hsis/src/Hsis.Cli/Hsis.Cli.csproj -c Release -r win-x64 --self-contained true -o $toolPath
           if ($LASTEXITCODE -ne 0) { throw 'HSIS build failed' }
-          # v0.4.4 omits the app icon from the CLI template; include the original asset.
+          # v0.4.6 omits the app icon from the CLI template; include the original asset.
           Copy-Item -LiteralPath ../hsis/src/Hsis.App/Hsis.ico -Destination (Join-Path $toolPath 'Template/src/Hsis.App/Hsis.ico')
           "HSIS_PATH=$(Join-Path $toolPath 'hsis.exe')" >> $env:GITHUB_ENV
       - name: Build installer

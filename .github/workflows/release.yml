@@ -45,6 +45,9 @@ jobs:
           $version = if ($env:GITHUB_EVENT_NAME -eq 'push') { $env:GITHUB_REF_NAME.Substring(1) } else { $env:INPUT_VERSION }
           if ($version -notmatch '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$') { throw 'Expected vMAJOR.MINOR.PATCH tag or MAJOR.MINOR.PATCH input' }
           "version=$version" >> $env:GITHUB_OUTPUT
+      - name: Prepare HSIS LZMA2 compression
+        shell: pwsh
+        run: ./installer/Prepare-Hsis.ps1 -HsisSource ../hsis
       - name: Build HSIS v0.6.1
         shell: pwsh
         run: |

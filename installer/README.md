@@ -26,9 +26,9 @@ Actions の **Build Windows installer → Run workflow** でバージョン番�
 Visual Studio 2022 のビルド環境と .NET 8 SDK が必要です。NSIS のインストールは不要です。既存の `VideoEditor.nsi` を HSIS で解析してセットアップを生成します。
 
 ```powershell
-git clone --branch v0.5.1 --depth 1 https://github.com/Himeyama/hsis.git ../hsis-v0.5.1
-dotnet publish ../hsis-v0.5.1/src/Hsis.Cli/Hsis.Cli.csproj -c Release -r win-x64 --self-contained true -o ../hsis-v0.5.1/artifacts/cli
-./installer/build-installer.ps1 -Version 0.1.0 -HsisPath ../hsis-v0.5.1/artifacts/cli/hsis.exe
+git clone --branch v0.6.1 --depth 1 https://github.com/Himeyama/hsis.git ../hsis-v0.6.1
+dotnet publish ../hsis-v0.6.1/src/Hsis.Cli/Hsis.Cli.csproj -c Release -r win-x64 --self-contained true -o ../hsis-v0.6.1/artifacts/cli
+./installer/build-installer.ps1 -Version 0.1.0 -HsisPath ../hsis-v0.6.1/artifacts/cli/hsis.exe
 ```
 
 出力先は `artifacts/installer` です。`-OutputDirectory` と `-HsisPath` で出力先や HSIS CLI のパスを指定できます。HSIS の `Template` フォルダーも必要です。既存の `build.ps1` から Visual Studio の MSBuild を呼び出して発行します。インストーラー作成中はアプリを起動しません。

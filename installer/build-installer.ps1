@@ -14,9 +14,9 @@ if (($Version.Split('.') | Where-Object { [long]$_ -gt 65535 }).Count) {
 $hsis = (Get-Command $HsisPath -CommandType Application -ErrorAction Stop).Source
 $templatePath = Join-Path (Split-Path -Parent $hsis) 'Template'
 [xml]$hsisProperties = Get-Content -LiteralPath (Join-Path $templatePath 'Directory.Build.props') -Raw
-if ($hsisProperties.Project.PropertyGroup.Version -ne '0.4.6') { throw 'HSIS v0.4.6 を使用してください。' }
+if ($hsisProperties.Project.PropertyGroup.Version -ne '0.5.1') { throw 'HSIS v0.5.1 を使用してください。' }
 if (!(Test-Path -LiteralPath (Join-Path $templatePath 'src/Hsis.App/Hsis.ico') -PathType Leaf)) {
-    throw 'HSIS テンプレートに Hsis.ico がありません。HSIS v0.4.6 の src/Hsis.App/Hsis.ico を同じ場所へコピーしてください。'
+    throw 'HSIS テンプレートに Hsis.ico がありません。HSIS v0.5.1 の src/Hsis.App/Hsis.ico を同じ場所へコピーしてください。'
 }
 $outputPath = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($OutputDirectory)
 # Each run publishes into an empty directory so old files cannot enter a release.

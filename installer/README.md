@@ -1,6 +1,6 @@
 # Windows インストーラーとリリース
 
-NSIS 3 で Windows x64 向けのインストーラーを作成します。Windows 10 バージョン 2004 以降が対象です。.NET と Windows App SDK は同梱されます。管理者権限は不要で、ユーザーごとの `%LOCALAPPDATA%\Programs\VideoEditor` にインストールし、スタートメニューと「インストールされているアプリ」に登録します。
+HSIS v0.4.4 で Windows x64 向けのインストーラーを作成します。Windows 10 バージョン 2004 以降が対象です。.NET と Windows App SDK は同梱されます。管理者権限は不要で、ユーザーごとの `%LOCALAPPDATA%\Programs\VideoEditor` にインストールし、スタートメニューと「インストールされているアプリ」に登録します。
 
 ## GitHub で配布
 
@@ -11,25 +11,30 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
-`.github/workflows/release.yml` が起動し、Release ビルド、NSIS インストーラー作成、SHA-256 チェックサム作成、GitHub Release 公開を実行します。Release に次のファイルが添付されます。
+`.github/workflows/release.yml` が起動し、Release ビルド、HSIS インストーラー作成、SHA-256 チェックサム作成、GitHub Release 公開を実行します。Release に次のファイルが添付されます。
 
 - `VideoEditor-0.1.0-win-x64-Setup.exe`
 - `VideoEditor-0.1.0-win-x64-Setup.exe.sha256`
 
 バージョンはタグから設定します。正式版の `v数字.数字.数字` 形式に対応し、各数値は 65535 以下です。リリース済みタグは再利用せず、新しいバージョンタグを作成してください。Actions がリポジトリで有効である必要があります。標準の `GITHUB_TOKEN` を使用するため追加のシークレットは不要です。
 
+Actions は `Himeyama/hsis` の `v0.4.4` タグを取得して CLI をビルドします。実行前にそのタグが公開されている必要があります。
+
 Actions の **Build Windows installer → Run workflow** でバージョン番号を入力すると、Release を公開せずにインストーラーを Artifacts に保存できます。
 
 ## ローカルで作成
 
-Visual Studio 2022 のビルド環境、.NET 8 SDK、NSIS 3 が必要です。
+Visual Studio 2022 のビルド環境と .NET 8 SDK が必要です。NSIS のインストールは不要です。既存の `VideoEditor.nsi` を HSIS で解析してセットアップを生成します。
 
 ```powershell
-choco install nsis -y
-./installer/build-installer.ps1 -Version 0.1.0
+git clone --branch v0.4.4 --depth 1 https://github.com/Himeyama/hsis.git ../hsis-v0.4.4
+dotnet publish ../hsis-v0.4.4/src/Hsis.Cli/Hsis.Cli.csproj -c Release -r win-x64 --self-contained true -o ../hsis-v0.4.4/artifacts/cli
+# v0.4.4 の CLI テンプレートにはアイコンが含まれないため、元のアセットを補います。
+Copy-Item ../hsis-v0.4.4/src/Hsis.App/Hsis.ico ../hsis-v0.4.4/artifacts/cli/Template/src/Hsis.App/Hsis.ico
+./installer/build-installer.ps1 -Version 0.1.0 -HsisPath ../hsis-v0.4.4/artifacts/cli/hsis.exe
 ```
 
-出力先は `artifacts/installer` です。`-OutputDirectory` と `-MakeNsis` で出力先や NSIS のパスを指定できます。既存の `build.ps1` から Visual Studio の MSBuild を呼び出して発行します。インストーラー作成中はアプリを起動しません。
+出力先は `artifacts/installer` です。`-OutputDirectory` と `-HsisPath` で出力先や HSIS CLI のパスを指定できます。HSIS の `Template` フォルダーも必要です。スクリプトはテンプレートのバージョンが `0.4.4` であることを確認します。既存の `build.ps1` から Visual Studio の MSBuild を呼び出して発行します。インストーラー作成中はアプリを起動しません。
 
 発行時には、WinUI の `VideoEditor.pri` と各画面の `.xbf` を明示的に公開先へ含めます。インストーラーの作成前にこれらが存在し、空でないことを検査します。通常のビルド成功だけでは配布版の起動確認にはならないため、配布前にはインストーラーから展開したアプリでもウィンドウが開くことを確認してください。
 
@@ -37,4 +42,4 @@ choco install nsis -y
 
 この構成ではコード署名を行いません。署名証明書による署名を追加するまでは、ダウンロードした実行ファイルに Windows の警告が出る場合があります。
 
-実装の参照: [GitHub のタグ push イベント](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows)、[Windows App SDK の自己完結型配置](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/self-contained-deploy/deploy-self-contained-apps)、[NSIS マニュアル](https://nsis.sourceforge.io/Docs/Chapter4.html)。
+実装の参照: [GitHub のタグ push イベント](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows)、[Windows App SDK の自己完結型配置](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/self-contained-deploy/deploy-self-contained-apps)、[HSIS v0.4.4](https://github.com/Himeyama/hsis/tree/v0.4.4)。

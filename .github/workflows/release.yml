@@ -19,8 +19,20 @@ jobs:
     runs-on: windows-2022
     permissions:
       contents: write
+    defaults:
+      run:
+        working-directory: VideoEditor
     steps:
       - uses: actions/checkout@v4
+        with:
+          path: VideoEditor
+      - name: Check out HSIS v0.4.4
+        uses: actions/checkout@v4
+        with:
+          repository: Himeyama/hsis
+          ref: v0.4.4
+          path: hsis
+          persist-credentials: false
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
@@ -33,23 +45,27 @@ jobs:
           $version = if ($env:GITHUB_EVENT_NAME -eq 'push') { $env:GITHUB_REF_NAME.Substring(1) } else { $env:INPUT_VERSION }
           if ($version -notmatch '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$') { throw 'Expected vMAJOR.MINOR.PATCH tag or MAJOR.MINOR.PATCH input' }
           "version=$version" >> $env:GITHUB_OUTPUT
-      - name: Install NSIS
+      - name: Build HSIS v0.4.4
         shell: pwsh
         run: |
-          choco install nsis --yes --no-progress
-          if ($LASTEXITCODE -ne 0) { throw 'NSIS installation failed' }
+          $toolPath = Join-Path $env:RUNNER_TEMP 'hsis-v0.4.4'
+          dotnet publish ../hsis/src/Hsis.Cli/Hsis.Cli.csproj -c Release -r win-x64 --self-contained true -o $toolPath
+          if ($LASTEXITCODE -ne 0) { throw 'HSIS build failed' }
+          # v0.4.4 omits the app icon from the CLI template; include the original asset.
+          Copy-Item -LiteralPath ../hsis/src/Hsis.App/Hsis.ico -Destination (Join-Path $toolPath 'Template/src/Hsis.App/Hsis.ico')
+          "HSIS_PATH=$(Join-Path $toolPath 'hsis.exe')" >> $env:GITHUB_ENV
       - name: Build installer
         shell: pwsh
         env:
           APP_VERSION: ${{ steps.version.outputs.version }}
-        run: ./installer/build-installer.ps1 -Version $env:APP_VERSION
+        run: ./installer/build-installer.ps1 -Version $env:APP_VERSION -HsisPath $env:HSIS_PATH
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: VideoEditor-${{ steps.version.outputs.version }}-win-x64
           path: |
-            artifacts/installer/*-Setup.exe
-            artifacts/installer/*-Setup.exe.sha256
+            VideoEditor/artifacts/installer/*-Setup.exe
+            VideoEditor/artifacts/installer/*-Setup.exe.sha256
           if-no-files-found: error
       - name: Publish GitHub Release
         if: github.event_name == 'push'

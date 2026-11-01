@@ -11,12 +11,12 @@ $source = Get-Content -LiteralPath $sourcePath -Raw
 # Compatibility patch for the pinned v0.6.1: Windows tar cannot encode LZMA2
 # or decode LZMA2 on all runners. Use 7-Zip for both build-time operations.
 $original = 'ProcessRunner.RunAsync(Executable, ["-c", "--format=7zip", "--options=7zip:compression=lzma2,7zip:compression-level=9", "-f", Path.GetFullPath(archive), "."], source, log, cancellationToken);'
-$replacement = 'ProcessRunner.RunAsync(Environment.GetEnvironmentVariable("HSIS_7ZIP_PATH") ?? throw new InvalidOperationException("HSIS_7ZIP_PATH is required."), ["a", "-t7z", "-m0=lzma2", "-mx=9", Path.GetFullPath(archive), ".\\*"], source, log, cancellationToken);'
+$replacement = 'string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("HSIS_7ZIP_PATH")) ? ' + $original.TrimEnd(';') + ' : ProcessRunner.RunAsync(Environment.GetEnvironmentVariable("HSIS_7ZIP_PATH")!, ["a", "-t7z", "-m0=lzma2", "-mx=9", Path.GetFullPath(archive), ".\\*"], source, log, cancellationToken);'
 if ($source.Split($original, [StringSplitOptions]::None).Count -ne 2) {
     throw 'Expected the original HSIS v0.6.1 archive creation code exactly once. Review the compatibility patch before updating HSIS.'
 }
 $originalExtract = 'ProcessRunner.RunAsync(Executable, ["-x", "-f", archive, "-C", destination, "-T", selection], destination, log, cancellationToken);'
-$replacementExtract = 'ProcessRunner.RunAsync(Environment.GetEnvironmentVariable("HSIS_7ZIP_PATH") ?? throw new InvalidOperationException("HSIS_7ZIP_PATH is required."), ["x", "-y", "-scsUTF-8", $"-o{Path.GetFullPath(destination)}", Path.GetFullPath(archive), $"@{Path.GetFullPath(selection)}"], destination, log, cancellationToken);'
+$replacementExtract = 'string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("HSIS_7ZIP_PATH")) ? ' + $originalExtract.TrimEnd(';') + ' : ProcessRunner.RunAsync(Environment.GetEnvironmentVariable("HSIS_7ZIP_PATH")!, ["x", "-y", "-scsUTF-8", $"-o{Path.GetFullPath(destination)}", Path.GetFullPath(archive), $"@{Path.GetFullPath(selection)}"], destination, log, cancellationToken);'
 if ($source.Split($originalExtract, [StringSplitOptions]::None).Count -ne 2) {
     throw 'Expected the original HSIS v0.6.1 archive extraction code exactly once.'
 }
